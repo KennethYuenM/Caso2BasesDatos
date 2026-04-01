@@ -28,9 +28,11 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 
 ## Direcciones
 - direccionID (PK)
-- paisID (FK)
-- provinciaEstado (FK)
+- divisionID (PK)
+- calle varchar (150)
+- número varchar(50)
 - ciudadID (FK)
-- informacionAdicional varchar(500)
+- referencia text
 - codigoPostal varchar(20)
+- direccionCompleta text (Generado automáticamente en el script)
 - fechaCreacion timestamp
