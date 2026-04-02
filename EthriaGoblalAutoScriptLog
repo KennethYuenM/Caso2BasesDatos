@@ -12,7 +12,8 @@ BEGIN
             'tablas',
             'acciones',
             'permisosxrole',
-            'permisos'
+            'permisos',
+            'estadosordenes'
         )
     LOOP
 

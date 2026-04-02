@@ -45,7 +45,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - accionID (FK)
 
 ## PermisosXRole
-- roleID (PK)
+- roleID (FK)
 - permisoID (FK)
 
 ## Paises
@@ -70,10 +70,9 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 ## Direcciones
 - direccionID (PK)
 - divisionID (FK)
-- usuarioID (FK) (Usuario que insertó la direccion)
+- usuarioModificacion (FK) (Usuario que insertó la direccion)
 - calle varchar (150)
-- número varchar(50)
-- ciudadID (FK)
+- número varchar(20)
 - referencia text
 - codigoPostal varchar(20)
 - direccionCompleta text (Generado automáticamente en el script)
@@ -82,21 +81,23 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 
 ## Puertos
 - puertoID (PK)
-- nombre varchar(50)
 - direccionID (FK)
+- usuarioModificacion (FK)
+- nombre varchar(50)
 - telefono varchar (20)
 - activo boolean
 
 ## AeroPuertos
 - aeroPuertoID (PK)
-- nombre varchar(50)
 - direccionID (FK)
+- nombre varchar(50)
+- usuarioModificacion (FK)
 - telefono varchar (20)
 - activo boolean
 
 ## Monedas
 - monedaID (PK)
-- usuarioID (FK)
+- usuarioModificacion (FK)
 - paisID (FK)
 - simboloMoneda varchar(10)
 - nombreMoneda varchar(50)
@@ -105,54 +106,166 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 
 ## TiposCambio
 - tipoCambioID (PK)
-- usuarioID (FK)
+- usuarioModificacion (FK)
 - moneda1ID (FK)
 - moneda2ID (FK) (validar con trigger que moneda 1 y 2 no sean iguales)
-- tipoCambio DECIMAL(18,6)
+- tipoCambio decimal(18,6)
 - tiempoCreacion timestamp
 - ultimaActualizacion timestamp
-- checksum VARCHAR(100)
+- checksum varchar(100)
 - activo boolean
 
 (cuando se actualice TiposCambio crear historial con triggerCambios
 ademas de actualizar la anterior fechaFin)
-## HitorialCambios
+## HitorialCambiosMonedas
 - histotalCambioID (PK)
 - moneda1ID (FK)
 - moneda2ID (FK)
-- tipoCambioID (PK)
-- usuarioID (FK)
+- tipoCambioID (FK)
+- usuarioModificacion (FK)
 - fechaInicio timestamp
 - fechaFin timestamp (en caso de ser la ultima por el año en 9999)
-- tipoCambio DECIMAL(18,6)
-- checksum VARCHAR(100)
+- tipoCambio decimal(18,6)
+- checksum varchar(100)
 - horaCambio timestamp
 
 (todo lo que se haga en la base de datos, cada insercion y actualizacion debe pasar por logs con scipts, incluyendo los cualquier begin y exception)
 ## Logs
 - logID (PK)
-- usuarioID (FK)
+- usuarioModificacion (FK)
 - tablaID (FK)
 - accionID (FK)
 - objetoAfectadoID int
 - datosViejos JSON
 - datosNuevos JSON
 - hora timestamp
+- error text
 - checksum text
 
+## Productos
+- productoID (PK)
+- categoriaID (FK)
+- marcaID (FK)
+- usuarioModificacion (FK)
+- nombre varchar(20)
+- descripcion text
+- descripcionManejo text
+- activo boolean
 
+## Categorias
+- categoriaID (PK)
+- nombre varchar(20)
+- activo boolean
 
+## ValorCaracteristicas
+- productoID: FK
+- caracteristicaID: FK
+- valor: varchar(50)
+- deleted: boolean
 
+## Caracteristicas
+- caracteristicaID (PK)
+- nombre varchar(50)
 
+## Marcas
+- marcaID (PK)
+- nombre varchar(20)
+- paisID (FK)
+- activo boolean
 
+## Proveedores
+- proveedorID (PK)
+- nombre varchar(30)
+- direccionID (FK)
+- activo boolean
 
+## ProductoProveedor
+- productoProveedorID (PK)
+- productoID (FK)
+- proveedorID (FK)
+- activo boolean
 
+## ContactosProveedor
+- contactoID (PK)
+- proveedorID (FK)
+- usuarioModificacion (FK)
+- nombre varchar(30)
+- telefono varchar(20)
+- email varchar(40)
+- activo boolean
 
+## Lotes (nota, lotes ya es en si un hitorial de precios)
+- loteID (PK)
+- productoProveedorID (FK)
+- monedaID (FK)
+- precio decimal(18,6)
+- ingredientes text
+- fechaFabricacion timestamp
+- fechaVencimiento timestamp (puede ser nulo)
 
+## EstadosOrdenes
+- estadoID (PK)
+- nombre varchar(10)
 
+## Ordenes
+- ordenID (PK)
+- estadoID (FK)
+- usuarioModificacion (FK)
+- direccionEntregaID (FK)
+- numeroOrden varchar(30)
+- fecha timestamp
 
+## OrdenDetalle
+- ordenDetalleID (PK)
+- loteID (FK)
+- impuestoID (FK)
+- cantidad int
+- precioFinal decimal(18,6)
+- descuento decimal(18,6)
+- checksum text
 
+## ImpuestosPais
+- impuestoID (PK)
+- paisID (FK)
+- usuarioModificacion (FK)
+- porcentaje decimal(5,2)
+- activo boolean
 
+## TrazabilidadOrden
+- trazabilidadID (PK)
+- ordenID (FK)
+- ubicacionID (FK → divisionesGeograficas)
+- usuarioModificacion (FK)
+- estadoID (FK)
+- fecha timestamp
 
+## Transacciones
+- transaccionID (PK)
+- monedaID (FK)
+- usuarioModificacion (FK)
+- tipoID (FK)
+- referenciaTipoID (FK)
+- estadoTransaccionID (FK)
+- monto decimal(18,6)
+- referenciaID int (ej: ordenID o loteID)
+- descripcion text
+- fecha timestamp
 
+## EstadadoTransacciones
+- estadoTransaccionID (PK)
+- nombre varchar(20)
 
+## TipoTransacciones
+- tipoID (PK)
+- nombre varchar(20)
+
+## ReferenciasTipos
+- referenciaTipoID (PK)
+- nombre varchar(20)
+
+## Inventario
+- inventarioID (PK)
+- loteID (FK)
+- usuarioModificacion (FK)
+- cantidadDisponible int
+- ultimaActualizacion timestamp
