@@ -1,20 +1,19 @@
--- =========================================
--- CREAR BASE DE DATOS
--- =========================================
-CREATE DATABASE etheria_global_sourcing_logistics;
+-- =========================
+-- ESQUEMA BASE
+-- =========================
+CREATE DATABASE "EtheriaGlobal";
+-- Conectarse manualmente luego
 
--- Conectarse a la base de datos
-\c etheria_global_sourcing_logistics;
+-- =========================
+-- USUARIOS Y SEGURIDAD
+-- =========================
 
--- =========================================
--- TABLAS DE SEGURIDAD
--- =========================================
 CREATE TABLE Usuarios (
     usuarioID SERIAL PRIMARY KEY,
     nombre VARCHAR(50),
     apellido VARCHAR(50),
     segundoApellido VARCHAR(50),
-    email VARCHAR(100),
+    email VARCHAR(100) UNIQUE,
     contraseñaHASH TEXT,
     creado TIMESTAMP,
     actualizado TIMESTAMP,
@@ -33,9 +32,13 @@ CREATE TABLE RolesXUsuario (
     roleID INT,
     asignado TIMESTAMP,
     PRIMARY KEY (usuarioID, roleID),
-    FOREIGN KEY (usuarioID) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (roleID) REFERENCES Roles(roleID)
+    FOREIGN KEY (usuarioID) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION
 );
+
+-- =========================
+-- PERMISOS
+-- =========================
 
 CREATE TABLE Tablas (
     tablaID SERIAL PRIMARY KEY,
@@ -52,21 +55,22 @@ CREATE TABLE Permisos (
     permisoID SERIAL PRIMARY KEY,
     tablaID INT,
     accionID INT,
-    FOREIGN KEY (tablaID) REFERENCES Tablas(tablaID),
-    FOREIGN KEY (accionID) REFERENCES Acciones(accionID)
+    FOREIGN KEY (tablaID) REFERENCES Tablas(tablaID) ON DELETE NO ACTION,
+    FOREIGN KEY (accionID) REFERENCES Acciones(accionID) ON DELETE NO ACTION
 );
 
 CREATE TABLE PermisosXRole (
     roleID INT,
     permisoID INT,
     PRIMARY KEY (roleID, permisoID),
-    FOREIGN KEY (roleID) REFERENCES Roles(roleID),
-    FOREIGN KEY (permisoID) REFERENCES Permisos(permisoID)
+    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION,
+    FOREIGN KEY (permisoID) REFERENCES Permisos(permisoID) ON DELETE NO ACTION
 );
 
--- =========================================
--- UBICACIÓN
--- =========================================
+-- =========================
+-- GEOGRAFÍA
+-- =========================
+
 CREATE TABLE Paises (
     paisID SERIAL PRIMARY KEY,
     nombre VARCHAR(30),
@@ -87,9 +91,9 @@ CREATE TABLE DivisionesGeograficas (
     nivelID INT,
     padreID INT,
     nombre VARCHAR(100),
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID),
-    FOREIGN KEY (nivelID) REFERENCES NivelesGeograficos(nivelID),
-    FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID)
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION,
+    FOREIGN KEY (nivelID) REFERENCES NivelesGeograficos(nivelID) ON DELETE NO ACTION,
+    FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID) ON DELETE NO ACTION
 );
 
 CREATE TABLE Direcciones (
@@ -103,35 +107,36 @@ CREATE TABLE Direcciones (
     direccionCompleta TEXT,
     fechaCreacion TIMESTAMP,
     activo BOOLEAN,
-    FOREIGN KEY (divisionID) REFERENCES DivisionesGeograficas(divisionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (divisionID) REFERENCES DivisionesGeograficas(divisionID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );
 
-CREATE TABLE Puertos (
-    puertoID SERIAL PRIMARY KEY,
+-- =========================
+-- CENTROS LOGÍSTICOS
+-- =========================
+
+CREATE TABLE TiposCentroLogistico (
+    tipoID SERIAL PRIMARY KEY,
+    nombre VARCHAR(20)
+);
+
+CREATE TABLE CentrosLogisticos (
+    centroLogisticoID SERIAL PRIMARY KEY,
+    tipoID INT,
     direccionID INT,
     usuarioModificacion INT,
     nombre VARCHAR(50),
     telefono VARCHAR(20),
     activo BOOLEAN,
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (tipoID) REFERENCES TiposCentroLogistico(tipoID) ON DELETE NO ACTION,
+    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );
 
-CREATE TABLE AeroPuertos (
-    aeroPuertoID SERIAL PRIMARY KEY,
-    direccionID INT,
-    usuarioModificacion INT,
-    nombre VARCHAR(50),
-    telefono VARCHAR(20),
-    activo BOOLEAN,
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
-);
-
--- =========================================
+-- =========================
 -- MONEDAS
--- =========================================
+-- =========================
+
 CREATE TABLE Monedas (
     monedaID SERIAL PRIMARY KEY,
     usuarioModificacion INT,
@@ -140,8 +145,8 @@ CREATE TABLE Monedas (
     nombreMoneda VARCHAR(50),
     tiempoCreacion TIMESTAMP,
     activo BOOLEAN,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION
 );
 
 CREATE TABLE TiposCambio (
@@ -154,9 +159,9 @@ CREATE TABLE TiposCambio (
     ultimaActualizacion TIMESTAMP,
     checksum VARCHAR(100),
     activo BOOLEAN,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION,
+    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION
 );
 
 CREATE TABLE HistorialCambiosMonedas (
@@ -170,15 +175,16 @@ CREATE TABLE HistorialCambiosMonedas (
     tipoCambio DECIMAL(18,6),
     checksum VARCHAR(100),
     horaCambio TIMESTAMP,
-    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION,
+    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- LOGS
--- =========================================
+-- =========================
+
 CREATE TABLE Logs (
     logID SERIAL PRIMARY KEY,
     usuarioModificacion INT,
@@ -190,23 +196,19 @@ CREATE TABLE Logs (
     hora TIMESTAMP,
     error TEXT,
     checksum TEXT,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (tablaID) REFERENCES Tablas(tablaID),
-    FOREIGN KEY (accionID) REFERENCES Acciones(accionID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (tablaID) REFERENCES Tablas(tablaID) ON DELETE NO ACTION,
+    FOREIGN KEY (accionID) REFERENCES Acciones(accionID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- PRODUCTOS
--- =========================================
+-- =========================
+
 CREATE TABLE Categorias (
     categoriaID SERIAL PRIMARY KEY,
     nombre VARCHAR(20),
     activo BOOLEAN
-);
-
-CREATE TABLE Caracteristicas (
-    caracteristicaID SERIAL PRIMARY KEY,
-    nombre VARCHAR(50)
 );
 
 CREATE TABLE Marcas (
@@ -214,7 +216,7 @@ CREATE TABLE Marcas (
     nombre VARCHAR(20),
     paisID INT,
     activo BOOLEAN,
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID)
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION
 );
 
 CREATE TABLE Productos (
@@ -226,9 +228,14 @@ CREATE TABLE Productos (
     descripcion TEXT,
     descripcionManejo TEXT,
     activo BOOLEAN,
-    FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID),
-    FOREIGN KEY (marcaID) REFERENCES Marcas(marcaID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID) ON DELETE NO ACTION,
+    FOREIGN KEY (marcaID) REFERENCES Marcas(marcaID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
+);
+
+CREATE TABLE Caracteristicas (
+    caracteristicaID SERIAL PRIMARY KEY,
+    nombre VARCHAR(50)
 );
 
 CREATE TABLE ValorCaracteristicas (
@@ -237,19 +244,20 @@ CREATE TABLE ValorCaracteristicas (
     valor VARCHAR(50),
     deleted BOOLEAN,
     PRIMARY KEY (productoID, caracteristicaID),
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID),
-    FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID)
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION,
+    FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- PROVEEDORES
--- =========================================
+-- =========================
+
 CREATE TABLE Proveedores (
     proveedorID SERIAL PRIMARY KEY,
     nombre VARCHAR(30),
     direccionID INT,
     activo BOOLEAN,
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID)
+    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION
 );
 
 CREATE TABLE ProductoProveedor (
@@ -257,8 +265,8 @@ CREATE TABLE ProductoProveedor (
     productoID INT,
     proveedorID INT,
     activo BOOLEAN,
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID),
-    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID)
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION,
+    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID) ON DELETE NO ACTION
 );
 
 CREATE TABLE ContactosProveedor (
@@ -269,13 +277,14 @@ CREATE TABLE ContactosProveedor (
     telefono VARCHAR(20),
     email VARCHAR(40),
     activo BOOLEAN,
-    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- LOTES
--- =========================================
+-- =========================
+
 CREATE TABLE Lotes (
     loteID SERIAL PRIMARY KEY,
     productoProveedorID INT,
@@ -284,13 +293,14 @@ CREATE TABLE Lotes (
     ingredientes TEXT,
     fechaFabricacion TIMESTAMP,
     fechaVencimiento TIMESTAMP,
-    FOREIGN KEY (productoProveedorID) REFERENCES ProductoProveedor(productoProveedorID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID)
+    FOREIGN KEY (productoProveedorID) REFERENCES ProductoProveedor(productoProveedorID) ON DELETE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- ORDENES
--- =========================================
+-- =========================
+
 CREATE TABLE EstadosOrdenes (
     estadoID SERIAL PRIMARY KEY,
     nombre VARCHAR(10)
@@ -303,9 +313,9 @@ CREATE TABLE Ordenes (
     direccionEntregaID INT,
     numeroOrden VARCHAR(30),
     fecha TIMESTAMP,
-    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (direccionEntregaID) REFERENCES Direcciones(direccionID)
+    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (direccionEntregaID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION
 );
 
 CREATE TABLE ImpuestosPais (
@@ -314,8 +324,8 @@ CREATE TABLE ImpuestosPais (
     usuarioModificacion INT,
     porcentaje DECIMAL(5,2),
     activo BOOLEAN,
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );
 
 CREATE TABLE OrdenDetalle (
@@ -326,26 +336,27 @@ CREATE TABLE OrdenDetalle (
     precioFinal DECIMAL(18,6),
     descuento DECIMAL(18,6),
     checksum TEXT,
-    FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
-    FOREIGN KEY (impuestoID) REFERENCES ImpuestosPais(impuestoID)
+    FOREIGN KEY (loteID) REFERENCES Lotes(loteID) ON DELETE NO ACTION,
+    FOREIGN KEY (impuestoID) REFERENCES ImpuestosPais(impuestoID) ON DELETE NO ACTION
 );
 
 CREATE TABLE TrazabilidadOrden (
     trazabilidadID SERIAL PRIMARY KEY,
     ordenID INT,
-    ubicacionID INT,
+    centroLogisticoID INT,
     usuarioModificacion INT,
     estadoID INT,
     fecha TIMESTAMP,
-    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
-    FOREIGN KEY (ubicacionID) REFERENCES DivisionesGeograficas(divisionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID)
+    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID) ON DELETE NO ACTION,
+    FOREIGN KEY (centroLogisticoID) REFERENCES CentrosLogisticos(centroLogisticoID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- TRANSACCIONES
--- =========================================
+-- =========================
+
 CREATE TABLE EstadoTransacciones (
     estadoTransaccionID SERIAL PRIMARY KEY,
     nombre VARCHAR(20)
@@ -372,22 +383,23 @@ CREATE TABLE Transacciones (
     referenciaID INT,
     descripcion TEXT,
     fecha TIMESTAMP,
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (tipoID) REFERENCES TipoTransacciones(tipoID),
-    FOREIGN KEY (referenciaTipoID) REFERENCES ReferenciasTipos(referenciaTipoID),
-    FOREIGN KEY (estadoTransaccionID) REFERENCES EstadoTransacciones(estadoTransaccionID)
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION,
+    FOREIGN KEY (tipoID) REFERENCES TipoTransacciones(tipoID) ON DELETE NO ACTION,
+    FOREIGN KEY (referenciaTipoID) REFERENCES ReferenciasTipos(referenciaTipoID) ON DELETE NO ACTION,
+    FOREIGN KEY (estadoTransaccionID) REFERENCES EstadoTransacciones(estadoTransaccionID) ON DELETE NO ACTION
 );
 
--- =========================================
+-- =========================
 -- INVENTARIO
--- =========================================
+-- =========================
+
 CREATE TABLE Inventario (
     inventarioID SERIAL PRIMARY KEY,
     loteID INT,
     usuarioModificacion INT,
     cantidadDisponible INT,
     ultimaActualizacion TIMESTAMP,
-    FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (loteID) REFERENCES Lotes(loteID) ON DELETE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION
 );

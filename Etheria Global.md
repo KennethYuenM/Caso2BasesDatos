@@ -75,25 +75,22 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - número varchar(20)
 - referencia text
 - codigoPostal varchar(20)
-- direccionCompleta text (Generado automáticamente en el script)
+- direccionCompleta text (Generado automáticamente en el script, hagarrando los datos de division id y creando un texto pasando por todas las autoreferencias hasta llegar al nivelID es 1, a demas de calle, número y referencia)
 - fechaCreacion timestamp
 - activo boolean
 
-## Puertos
-- puertoID (PK)
+## CentrosLogisticos
+- centroLogisticoID (PK)
+- tipoID (FK)
 - direccionID (FK)
 - usuarioModificacion (FK)
 - nombre varchar(50)
-- telefono varchar (20)
+- telefono varchar(20)
 - activo boolean
 
-## AeroPuertos
-- aeroPuertoID (PK)
-- direccionID (FK)
-- nombre varchar(50)
-- usuarioModificacion (FK)
-- telefono varchar (20)
-- activo boolean
+## TiposCentroLogistico
+- tipoID (PK)
+- nombre varchar(20) (Puerto, Aeropuerto, Empresa Repartidora)
 
 ## Monedas
 - monedaID (PK)
@@ -108,7 +105,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - tipoCambioID (PK)
 - usuarioModificacion (FK)
 - moneda1ID (FK)
-- moneda2ID (FK) (validar con trigger que moneda 1 y 2 no sean iguales)
+- moneda2ID (FK) (validar con trigger que moneda 1 y 2 no sean iguales y un try cath)
 - tipoCambio decimal(18,6)
 - tiempoCreacion timestamp
 - ultimaActualizacion timestamp
@@ -132,7 +129,7 @@ ademas de actualizar la anterior fechaFin)
 (todo lo que se haga en la base de datos, cada insercion y actualizacion debe pasar por logs con scipts, incluyendo los cualquier begin y exception)
 ## Logs
 - logID (PK)
-- usuarioModificacion (FK)
+- usuarioModificacion (FK) (puede ser nulo en ciertos casos)
 - tablaID (FK)
 - accionID (FK)
 - objetoAfectadoID int
@@ -234,7 +231,7 @@ ademas de actualizar la anterior fechaFin)
 ## TrazabilidadOrden
 - trazabilidadID (PK)
 - ordenID (FK)
-- ubicacionID (FK → divisionesGeograficas)
+- centroLogisticoID (FK)
 - usuarioModificacion (FK)
 - estadoID (FK)
 - fecha timestamp
@@ -269,3 +266,5 @@ ademas de actualizar la anterior fechaFin)
 - usuarioModificacion (FK)
 - cantidadDisponible int
 - ultimaActualizacion timestamp
+
+On deleted no action para las fk
