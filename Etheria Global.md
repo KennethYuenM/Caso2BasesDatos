@@ -82,7 +82,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 ## CentrosLogisticos
 - centroLogisticoID (PK)
 - tipoID (FK)
-- direccionID (FK)
+- direccionID (FK) (Direccion principal, pero unica de un centro de distribución)
 - usuarioModificacion (FK)
 - nombre varchar(50)
 - telefono varchar(20)
@@ -232,6 +232,7 @@ ademas de actualizar la anterior fechaFin)
 - trazabilidadID (PK)
 - ordenID (FK)
 - centroLogisticoID (FK)
+- direccionID (FK)
 - usuarioModificacion (FK)
 - estadoID (FK)
 - fecha timestamp
