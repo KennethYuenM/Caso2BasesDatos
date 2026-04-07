@@ -16,6 +16,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - contraseñaHASH text
 - creado timestamp
 - actualizado timestamp
+- ultimoLogin timestamp
 - activo boolean
 
 ## Roles 
@@ -39,7 +40,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - accionID (PK)
 - nombreAccion varchar(10) (CREATE, READ, UPDATE, DELETE)
 
-## Permisos
+## PermisosSistema
 - permisoID (PK)
 - tablaID (FK)
 - accionID (FK)
@@ -73,7 +74,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - usuarioModificacion (FK) (Usuario que insertó la direccion)
 - calle varchar (150)
 - número varchar(20)
-- referencia text
+- referencia varchar(500)
 - codigoPostal varchar(20)
 - direccionCompleta text (Generado automáticamente en el script, hagarrando los datos de division id y creando un texto pasando por todas las autoreferencias hasta llegar al nivelID es 1, a demas de calle, número y referencia)
 - fechaCreacion timestamp
@@ -86,6 +87,11 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - usuarioModificacion (FK)
 - nombre varchar(50)
 - telefono varchar(20)
+- activo boolean
+
+## ContactosProveedor
+- centroLogisticoID (FK)
+- contactoID (FK)
 - activo boolean
 
 ## TiposCentroLogistico
@@ -114,14 +120,14 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 
 (cuando se actualice TiposCambio crear historial con triggerCambios
 ademas de actualizar la anterior fechaFin)
-## HitorialCambiosMonedas
+## HistorialCambiosMonedas
 - histotalCambioID (PK)
 - moneda1ID (FK)
 - moneda2ID (FK)
 - tipoCambioID (FK)
 - usuarioModificacion (FK)
 - fechaInicio timestamp
-- fechaFin timestamp (en caso de ser la ultima por el año en 9999)
+- fechaFin timestamp (en caso de ser la ultima poner en el año en 9999)
 - tipoCambio decimal(18,6)
 - checksum varchar(100)
 - horaCambio timestamp
@@ -139,14 +145,30 @@ ademas de actualizar la anterior fechaFin)
 - error text
 - checksum text
 
+(investigando, cada país tiene su forma de cobrar y sumar los premisos, para simplificarlo
+simplemente tiene un campo, que seria el cobro por el tramite por producto)
+## PermisosImportacion 
+- permisoID (PK)
+- paisID (FK)
+- tipoPermisoID (FK)
+- usuarioModificacion (FK)
+- nombrePermiso varchar(20)
+- costo decimal(18,6)
+- activo boolean
+
+## TiposPermisos
+- tipoPermisoID (FK)
+- nombreTipoPermiso varchar(20)
+
+
 ## Productos
 - productoID (PK)
 - categoriaID (FK)
-- marcaID (FK)
 - usuarioModificacion (FK)
-- nombre varchar(20)
-- descripcion text
-- descripcionManejo text
+- proveedorID (FK)
+- nombre varchar(40)
+- descripcion varchar(200)
+- descripcionManejo varchar(200)
 - activo boolean
 
 ## Categorias
@@ -164,39 +186,32 @@ ademas de actualizar la anterior fechaFin)
 - caracteristicaID (PK)
 - nombre varchar(50)
 
-## Marcas
-- marcaID (PK)
-- nombre varchar(20)
-- paisID (FK)
-- activo boolean
-
 ## Proveedores
 - proveedorID (PK)
-- nombre varchar(30)
 - direccionID (FK)
+- nombre varchar(50)
 - activo boolean
 
-## ProductoProveedor
-- productoProveedorID (PK)
-- productoID (FK)
-- proveedorID (FK)
+## Contactos
+- contactoID (PK)
+- usuarioModificacion (FK)
+- nombre varchar(50)
+- apellido varchar(50)
+- segundoApellido varchar(50)
+- email varchar(100)
+- número varchar (20)
 - activo boolean
 
 ## ContactosProveedor
-- contactoID (PK)
 - proveedorID (FK)
-- usuarioModificacion (FK)
-- nombre varchar(30)
-- telefono varchar(20)
-- email varchar(40)
+- contactoID (FK)
 - activo boolean
 
 ## Lotes (nota, lotes ya es en si un hitorial de precios)
 - loteID (PK)
-- productoProveedorID (FK)
-- monedaID (FK)
+- productoID (FK)
 - precio decimal(18,6)
-- ingredientes text
+- ingredientes varchar(500)
 - fechaFabricacion timestamp
 - fechaVencimiento timestamp (puede ser nulo)
 
@@ -205,20 +220,27 @@ ademas de actualizar la anterior fechaFin)
 - nombre varchar(10)
 
 ## Ordenes
-- ordenID (PK)
+- ordenID (PK) (es necesario agregar codigoOrden, o se puede dejar solo con el id?)
 - estadoID (FK)
 - usuarioModificacion (FK)
+- direccionEnvioID (FK)
 - direccionEntregaID (FK)
+- tipoOrden enum(venta, compra)
 - numeroOrden varchar(30)
+- precioFinal decimal(18,6) 
 - fecha timestamp
 
-## OrdenDetalle
+(se nececita un script que cada que se cree una orden detalle, se sume el precioLoteFinal al precioFinal del orden)
+## OrdenDetalles
 - ordenDetalleID (PK)
+- ordenID (FK)
 - loteID (FK)
 - impuestoID (FK)
+- permisoID (FK) 
 - cantidad int
-- precioFinal decimal(18,6)
 - descuento decimal(18,6)
+- costoEnvio decimal(18,6)
+- precioLoteFinal decimal(18,6) (se calcula con el ((costo del lote - descuento) + impuesto + permisos + costoEnvio)* cantidad)
 - checksum text
 
 ## ImpuestosPais
@@ -242,12 +264,12 @@ ademas de actualizar la anterior fechaFin)
 - monedaID (FK)
 - usuarioModificacion (FK)
 - tipoID (FK)
-- referenciaTipoID (FK)
 - estadoTransaccionID (FK)
+- ordenID (FK)
 - monto decimal(18,6)
-- referenciaID int (ej: ordenID o loteID)
 - descripcion text
 - fecha timestamp
+- checksum text
 
 ## EstadadoTransacciones
 - estadoTransaccionID (PK)
@@ -257,15 +279,27 @@ ademas de actualizar la anterior fechaFin)
 - tipoID (PK)
 - nombre varchar(20)
 
-## ReferenciasTipos
-- referenciaTipoID (PK)
-- nombre varchar(20)
-
-## Inventario
+## Inventarios
 - inventarioID (PK)
 - loteID (FK)
 - usuarioModificacion (FK)
 - cantidadDisponible int
 - ultimaActualizacion timestamp
+
+(cada que se crea una orden, se crea automaticamente un estado de cuenta, cada que se actualiza un estado de cuenta en el apartado de estado, se actualiza el balance neto solamente si se cambia a comletado)
+## EstadosCuenta
+- estadoCuentaID (PK)
+- ordenID (FK)
+- usuarioModificacion (FK)
+- tipoMovimiento enum ('Debito', 'Credito', segun el tipoOrden)
+- estado enum (pendiente, completado, cancelado)
+- monto decimal(18,6)
+- fechaRegistro timestamp
+- checksum text
+
+## BalanceNeto
+- balanceID (PK)
+- saldo decimal(18,6)
+- ultimaActualización timestamp
 
 On deleted no action para las fk
