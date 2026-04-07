@@ -1,65 +1,7 @@
-Crea el script para la crecion de la base de datos en MySQL con la siguien informacion, recuerda siempre agregar ON DELETE NO ACTION
-
-dynamicSiteInfo
-	dynamicSiteID PK
-	siteCode varchar 30
-	siteName varchar 80
-	brandTemplateID bigint
-	countryID bigint
-	currencyID bigint
-	siteStatusID bigint
-	primaryDomainName varchar 150
-	marketingFocus varchar 80
-	brandVoice varchar 80
-	targetSegment varchar 80
-	launchDate datetime
-	closeDate datetime
-	clientName varchar 80
-	logoURL varchar 255
-	isActive boolean
-	createdAt timestamp
-	updatedAt timestamp
-
-dynamicSiteStatus
-	siteStatusID PK
-	statusCode varchar 30
-	statusName varchar 50
-	statusDescription varchar 150
-	isActive boolean
-	createdAt timestamp
-	updatedAt timestamp
-
-dynamicSiteStatusLog
-	dynamicSiteStatusLogID PK
-	dynamicSiteID bigint
-	previousSiteStatusID bigint
-	currentSiteStatusID bigint
-	changeDetails varchar 250
-	changeSource varchar 30
-	changedByUserID bigint
-	changedAt timestamp
-	createdAt timestamp
-
-dynamicSiteDomain
-	dynamicSiteDomainID PK
-	dynamicSiteID bigint
-	domainName varchar 150
-	isPrimary boolean
-	isActive boolean
-	createdAt timestamp
-	updatedAt timestamp
-
-dynamicSiteAIGeneration
-	dynamicSiteAIGenerationID PK
-	dynamicSiteID bigint
-	promptVersion varchar 50
-	promptContent text
-	generatedConfiguration json
-	generationStatus varchar 30
-	generationDetails varchar 250
-	generatedAt timestamp
-	createdAt timestamp
-	updatedAt timestamp
+Crea el script para la creacion de la base de datos en MySQL con la siguien informacion, recuerda siempre agregar ON DELETE NO ACTION
+El contexto es: Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de generar sitios de e-commerce dinámicos.
+A partir de parámetros (logo, enfoque, país), la IA despliega tiendas virtuales con marcas blancas.
+Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic, cada uno con un enfoque de marketing y mensajes distintos para el mismo producto base.
 
 currency
 	currencyID PK
@@ -75,6 +17,7 @@ country
 	countryName varchar 50
 	iso2Code char 2
 	iso3Code char 3
+	localCurrencyID bigint
 	isActive boolean
 	createdAt timestamp
 	updatedAt timestamp
@@ -104,9 +47,29 @@ historicalExchangeRate
 	validTo timestamp
 	recordedAt timestamp
 
+userRole
+	roleCode PK varchar 30
+	roleName varchar 50
+	roleDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+userInfo
+	userID PK
+	userCode varchar 30
+	firstName varchar 100
+	lastName varchar 100
+	email varchar 150
+	passwordHash varchar 255
+	roleCode varchar 30
+	isActive boolean
+	lastLoginAt timestamp
+	createdAt timestamp
+	updatedAt timestamp
+
 brandTemplate
-	brandTemplateID PK
-	brandCode varchar 30
+	brandCode PK varchar 30
 	brandName varchar 40
 	logoURL varchar 255
 	corePromise varchar 250
@@ -115,27 +78,108 @@ brandTemplate
 	createdAt timestamp
 	updatedAt timestamp
 
-userRole
-	userRoleID PK
-	roleCode varchar 30
-	roleName varchar 50
-	roleDescription varchar 150
+dynamicSiteStatus
+	statusCode PK varchar 30
+	statusName varchar 50
+	statusDescription varchar 150
 	isActive boolean
 	createdAt timestamp
 	updatedAt timestamp
 
-user
-	userID PK
-	userCode varchar 30
-	firstName varchar 100
-	lastName varchar 100
-	email varchar 150
-	passwordHash varchar 255
-	userRoleID bigint
+dynamicSiteGenerationStatus
+	statusCode PK varchar 30
+	statusName varchar 50
+	statusDescription varchar 150
 	isActive boolean
-	lastLoginAt timestamp
 	createdAt timestamp
 	updatedAt timestamp
+
+dynamicSiteEventType
+	eventTypeCode PK varchar 30
+	eventName varchar 50
+	eventDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+dynamicSiteInfo
+	dynamicSiteID PK
+	siteCode varchar 30
+	siteName varchar 80
+	brandCode varchar 30
+	countryID bigint
+	currencyID bigint
+	siteStatusCode varchar 30
+	primaryDomainName varchar 150
+	marketingFocus varchar 80
+	brandVoice varchar 80
+	targetSegment varchar 80
+	launchDate datetime
+	closeDate datetime
+	clientName varchar 80
+	logoURL varchar 255
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+dynamicSiteDomain
+	dynamicSiteDomainID PK
+	dynamicSiteID bigint
+	domainName varchar 150
+	isPrimary boolean
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+dynamicSiteAIGeneration
+	dynamicSiteAIGenerationID PK
+	dynamicSiteID bigint
+	promptContent text
+	generatedConfiguration json
+	generationStatusCode varchar 30
+	generationDetails varchar 250
+	generatedAt timestamp
+	createdAt timestamp
+	updatedAt timestamp
+
+dynamicSiteMetric
+	dynamicSiteMetricID PK
+	dynamicSiteID bigint
+	metricDate date
+	visitCount int
+	sessionCount int
+	purchaseCount int
+	conversionRate decimal 10,4
+	createdAt timestamp
+	updatedAt timestamp
+
+changeSource
+	sourceCode PK varchar 30
+	sourceName varchar 50
+	sourceDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+dynamicSiteStatusLog
+	dynamicSiteStatusLogID PK
+	dynamicSiteID bigint
+	previousSiteStatusCode varchar 30
+	currentSiteStatusCode varchar 30
+	changeDetails varchar 250
+	changeSourceCode varchar 30
+	changedByUserID bigint
+	changedAt timestamp
+	createdAt timestamp
+
+dynamicSiteAuditLog
+	dynamicSiteAuditLogID PK
+	dynamicSiteID bigint
+	eventTypeCode varchar 30
+	eventDetails varchar 250
+	performedByUserID bigint
+	performedAt timestamp
+	createdAt timestamp
 
 customer
 	customerID PK
@@ -152,8 +196,7 @@ customer
 	updatedAt timestamp
 
 orderStatus
-	orderStatusID PK
-	statusCode varchar 30
+	statusCode PK varchar 30
 	statusName varchar 50
 	statusDescription varchar 150
 	isActive boolean
@@ -165,8 +208,9 @@ customerOrder
 	orderCode varchar 50
 	customerID bigint
 	dynamicSiteID bigint
+	customerCountryID bigint
 	currencyID bigint
-	orderStatusID bigint
+	orderStatusCode varchar 30
 	orderDate timestamp
 	subTotal decimal 18,6
 	taxTotal decimal 18,6
@@ -180,29 +224,16 @@ customerOrder
 customerOrderStatusLog
 	customerOrderStatusLogID PK
 	customerOrderID bigint
-	previousOrderStatusID bigint
-	currentOrderStatusID bigint
+	previousOrderStatusCode varchar 30
+	currentOrderStatusCode varchar 30
 	changeDetails varchar 250
-	changeSource varchar 30
+	changeSourceCode varchar 30
 	changedByUserID bigint
 	changedAt timestamp
 	createdAt timestamp
 
-customerOrderLine
-	customerOrderLineID PK
-	customerOrderID bigint
-	productID bigint
-	quantity int
-	unitPrice decimal 18,6
-	taxAmount decimal 18,6
-	discountAmount decimal 18,6
-	lineTotal decimal 18,6
-	createdAt timestamp
-	updatedAt timestamp
-
 productCategory
-	productCategoryID PK
-	categoryCode varchar 30
+	categoryCode PK varchar 30
 	categoryName varchar 80
 	categoryDescription varchar 200
 	isActive boolean
@@ -213,12 +244,13 @@ product
 	productID PK
 	productCode varchar 50
 	dynamicSiteID bigint
-	productCategoryID bigint
+	categoryCode varchar 30
 	productName varchar 120
 	productDescription varchar 500
 	sku varchar 50
 	baseCurrencyID bigint
 	basePrice decimal 18,6
+	updatedByUserID bigint
 	isActive boolean
 	createdAt timestamp
 	updatedAt timestamp
@@ -234,32 +266,141 @@ productPrice
 	createdAt timestamp
 	updatedAt timestamp
 
+productImageType
+	typeCode PK varchar 30
+	typeName varchar 50
+	typeDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
 productImage
 	productImageID PK
 	productID bigint
+	typeCode varchar 30
 	imageURL varchar 255
-	imageType varchar 30
 	displayOrder int
 	isPrimary boolean
 	isActive boolean
 	createdAt timestamp
 	updatedAt timestamp
 
+packagingType
+	packagingTypeCode PK varchar 30
+	packagingTypeName varchar 50
+	packagingTypeDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+productPackaging
+	productPackagingID PK
+	productID bigint
+	countryID bigint
+	packagingTypeCode varchar 30
+	packagingName varchar 80
+	packagingDescription varchar 250
+	unitContent varchar 50
+	unitMeasure varchar 30
+	packageMaterial varchar 50
+	isFragile boolean
+	isPrimary boolean
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+labelType
+	labelTypeCode PK varchar 30
+	labelTypeName varchar 50
+	labelTypeDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+productLabel
+	productLabelID PK
+	productID bigint
+	dynamicSiteID bigint
+	countryID bigint
+	labelTypeCode varchar 30
+	labelName varchar 80
+	labelDescription varchar 250
+	labelLanguage varchar 30
+	labelContent text
+	isPrimary boolean
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+regulatoryRequirementType
+	requirementTypeCode PK varchar 30
+	requirementTypeName varchar 60
+	requirementTypeDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+permissionStatus
+	statusCode PK varchar 30
+	statusName varchar 50
+	statusDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+countryProductRequirement
+	countryProductRequirementID PK
+	productID bigint
+	countryID bigint
+	requirementTypeCode varchar 30
+	requirementName varchar 100
+	requirementDescription varchar 250
+	isMandatory boolean
+	issuedBy varchar 80
+	validFrom timestamp
+	validTo timestamp
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+countryProductPermission
+	countryProductPermissionID PK
+	productID bigint
+	countryID bigint
+	permissionCode varchar 50
+	permissionName varchar 100
+	permissionStatusCode varchar 30
+	certificateNumber varchar 80
+	issuedBy varchar 80
+	issuedAt timestamp
+	expiresAt timestamp
+	notes varchar 250
+	createdAt timestamp
+	updatedAt timestamp
+
+inventorySource
+	sourceCode PK varchar 30
+	sourceName varchar 50
+	sourceDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
 inventory
 	inventoryID PK
+	dynamicSiteID bigint
 	productID bigint
 	availableQuantity int
 	reservedQuantity int
 	sellableQuantity int
 	reorderLevel int
-	inventorySource varchar 30
+	sourceCode varchar 30
 	lastStockUpdateAt timestamp
 	createdAt timestamp
 	updatedAt timestamp
 
 paymentMethod
-	paymentMethodID PK
-	methodCode varchar 30
+	methodCode PK varchar 30
 	methodName varchar 50
 	methodDescription varchar 150
 	isActive boolean
@@ -267,10 +408,17 @@ paymentMethod
 	updatedAt timestamp
 
 paymentTransactionStatus
-	paymentTransactionStatusID PK
-	statusCode varchar 30
+	statusCode PK varchar 30
 	statusName varchar 50
 	statusDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
+paymentProvider
+	providerCode PK varchar 30
+	providerName varchar 50
+	providerDescription varchar 150
 	isActive boolean
 	createdAt timestamp
 	updatedAt timestamp
@@ -279,19 +427,26 @@ paymentTransaction
 	paymentTransactionID PK
 	customerOrderID bigint
 	transactionCode varchar 50
-	paymentMethodID bigint
-	paymentTransactionStatusID bigint
+	methodCode varchar 30
+	paymentStatusCode varchar 30
+	providerCode varchar 30
 	transactionAmount decimal 18,6
 	currencyID bigint
-	providerName varchar 50
 	providerReference varchar 80
 	transactionDate timestamp
 	createdAt timestamp
 	updatedAt timestamp
 
+shipmentViewType
+	viewTypeCode PK varchar 30
+	viewTypeName varchar 50
+	viewTypeDescription varchar 150
+	isActive boolean
+	createdAt timestamp
+	updatedAt timestamp
+
 shipmentStatus
-	shipmentStatusID PK
-	statusCode varchar 30
+	statusCode PK varchar 30
 	statusName varchar 50
 	statusDescription varchar 150
 	isActive boolean
@@ -302,24 +457,15 @@ shipment
 	shipmentID PK
 	customerOrderID bigint
 	shipmentCode varchar 50
-	shipmentStatusID bigint
+	shipmentStatusCode varchar 30
 	shippingAddress varchar 250
 	trackingNumber varchar 80
 	carrierName varchar 60
-	shipmentViewType varchar 30
+	viewTypeCode varchar 30
 	shippedAt timestamp
 	deliveredAt timestamp
 	createdAt timestamp
 	updatedAt timestamp
-
-dynamicSiteAuditLog
-	dynamicSiteAuditLogID PK
-	dynamicSiteID bigint
-	eventType varchar 50
-	eventDetails varchar 250
-	performedByUserID bigint
-	performedAt timestamp
-	createdAt timestamp
 
 etlExecutionLog
 	etlExecutionLogID PK
@@ -333,6 +479,3 @@ etlExecutionLog
 	startedAt timestamp
 	finishedAt timestamp
 	createdAt timestamp
-	
-
-
