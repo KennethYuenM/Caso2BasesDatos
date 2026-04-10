@@ -22,16 +22,20 @@ CREATE OR REPLACE FUNCTION fn_get_pk_column(p_table TEXT)
 RETURNS TEXT AS $$
 DECLARE v_pk TEXT;
 BEGIN
-    SELECT a.attname INTO v_pk
-    FROM pg_index i -- consulta automaticamente las PK de Postgre
-    JOIN pg_attribute a 
-        ON a.attrelid = i.indrelid 
-       AND a.attnum = ANY(i.indkey)
-    WHERE i.indrelid = p_table::regclass
-    AND i.indisprimary
-    LIMIT 1;
+    BEGIN
+        SELECT a.attname INTO v_pk
+        FROM pg_index i
+        JOIN pg_attribute a 
+            ON a.attrelid = i.indrelid 
+           AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = p_table::regclass
+        AND i.indisprimary
+        LIMIT 1;
 
-    RETURN v_pk;
+        RETURN v_pk;
+    EXCEPTION WHEN OTHERS THEN
+        RETURN NULL;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -50,14 +54,16 @@ CREATE OR REPLACE FUNCTION fn_insert_log(
 RETURNS VOID AS $$
 DECLARE v_tablaID INT; v_accionID INT;
 BEGIN
-    SELECT tablaID INTO v_tablaID FROM Tablas WHERE LOWER(nombreTabla)=LOWER(p_tabla);
-    SELECT accionID INTO v_accionID FROM Acciones WHERE nombreAccion=p_accion;
+    BEGIN
+        SELECT tablaID INTO v_tablaID FROM Tablas WHERE LOWER(nombreTabla)=LOWER(p_tabla);
+        SELECT accionID INTO v_accionID FROM Acciones WHERE nombreAccion=p_accion;
 
-    INSERT INTO Logs(usuarioModificacion,tablaID,accionID,objetoAfectadoID,datosViejos,datosNuevos,error)
-    VALUES (p_usuario,v_tablaID,v_accionID,p_objeto_id,p_old,p_new,p_error);
+        INSERT INTO Logs(usuarioModificacion,tablaID,accionID,objetoAfectadoID,datosViejos,datosNuevos,error)
+        VALUES (p_usuario,v_tablaID,v_accionID,p_objeto_id,p_old,p_new,p_error);
 
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Error log: %', SQLERRM;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error log: %', SQLERRM;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -68,30 +74,46 @@ CREATE OR REPLACE FUNCTION fn_trigger_log()
 RETURNS TRIGGER AS $$
 DECLARE v_pk TEXT; v_id INT; v_usuario INT;
 BEGIN
-    v_pk := fn_get_pk_column(TG_TABLE_NAME);
+    BEGIN
+        v_pk := fn_get_pk_column(TG_TABLE_NAME);
 
-    IF TG_OP='INSERT' THEN
-        v_id := (to_jsonb(NEW)->>v_pk)::INT;
-        v_usuario := NEW.usuarioModificacion;
-        PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'INSERT',v_id,NULL,row_to_json(NEW),NULL);
-        RETURN NEW;
+        IF TG_OP='INSERT' THEN
+            v_id := (to_jsonb(NEW)->>v_pk)::INT;
+            v_usuario := NEW.usuarioModificacion;
 
-    ELSIF TG_OP='UPDATE' THEN
-        v_id := (to_jsonb(NEW)->>v_pk)::INT;
-        v_usuario := NEW.usuarioModificacion;
-        PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'UPDATE',v_id,row_to_json(OLD),row_to_json(NEW),NULL);
-        RETURN NEW;
+            IF TG_TABLE_NAME != 'logs' THEN
+                PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'INSERT',v_id,NULL,row_to_json(NEW),NULL);
+            END IF;
 
-    ELSIF TG_OP='DELETE' THEN
-        v_id := (to_jsonb(OLD)->>v_pk)::INT;
-        v_usuario := OLD.usuarioModificacion;
-        PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'DELETE',v_id,row_to_json(OLD),NULL,NULL);
-        RETURN OLD;
-    END IF;
+            RETURN NEW;
 
-EXCEPTION WHEN OTHERS THEN
-    PERFORM fn_insert_log(NULL,TG_TABLE_NAME,TG_OP,NULL,NULL,NULL,SQLERRM);
-    RAISE;
+        ELSIF TG_OP='UPDATE' THEN
+            v_id := (to_jsonb(NEW)->>v_pk)::INT;
+            v_usuario := NEW.usuarioModificacion;
+
+            IF TG_TABLE_NAME != 'logs' THEN
+                PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'UPDATE',v_id,row_to_json(OLD),row_to_json(NEW),NULL);
+            END IF;
+
+            RETURN NEW;
+
+        ELSIF TG_OP='DELETE' THEN
+            v_id := (to_jsonb(OLD)->>v_pk)::INT;
+            v_usuario := OLD.usuarioModificacion;
+
+            IF TG_TABLE_NAME != 'logs' THEN
+                PERFORM fn_insert_log(v_usuario,TG_TABLE_NAME,'DELETE',v_id,row_to_json(OLD),NULL,NULL);
+            END IF;
+
+            RETURN OLD;
+        END IF;
+
+    EXCEPTION WHEN OTHERS THEN
+        IF TG_TABLE_NAME != 'logs' THEN
+            PERFORM fn_insert_log(NULL,TG_TABLE_NAME,TG_OP,NULL,NULL,NULL,SQLERRM);
+        END IF;
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -101,30 +123,42 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION fn_update_last_login()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.usuarioModificacion IS NOT NULL THEN
-        UPDATE Usuarios
-        SET ultimoLogin = CURRENT_TIMESTAMP
-        WHERE usuarioID = NEW.usuarioModificacion;
-    END IF;
-    RETURN NEW;
+    BEGIN
+        IF NEW.usuarioModificacion IS NOT NULL THEN
+            UPDATE Usuarios
+            SET ultimoLogin = CURRENT_TIMESTAMP
+            WHERE usuarioID = NEW.usuarioModificacion;
+        END IF;
+
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'Usuarios','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
 -- =========================================
 -- 7. DIRECCIONES
 -- =========================================
+
 CREATE OR REPLACE FUNCTION fn_validar_division()
 RETURNS TRIGGER AS $$
 DECLARE v_max INT; v_actual INT;
 BEGIN
-    SELECT MAX(nivelID) INTO v_max FROM NivelesGeograficos;
-    SELECT nivelID INTO v_actual FROM DivisionesGeograficas WHERE divisionID=NEW.divisionID;
+    BEGIN
+        SELECT MAX(nivelID) INTO v_max FROM NivelesGeograficos;
+        SELECT nivelID INTO v_actual FROM DivisionesGeograficas WHERE divisionID=NEW.divisionID;
 
-    IF v_actual <> v_max THEN
-        RAISE EXCEPTION 'Division no es nivel más bajo';
-    END IF;
+        IF v_actual <> v_max THEN
+            RAISE EXCEPTION 'Division no es nivel más bajo';
+        END IF;
 
-    RETURN NEW;
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'Direcciones','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -132,22 +166,27 @@ CREATE OR REPLACE FUNCTION fn_generar_direccion()
 RETURNS TRIGGER AS $$
 DECLARE v_text TEXT := ''; v_nombre TEXT; v_padre INT; v_id INT := NEW.divisionID;
 BEGIN
-    WHILE v_id IS NOT NULL LOOP
-        SELECT nombre, padreID INTO v_nombre, v_padre
-        FROM DivisionesGeograficas
-        WHERE divisionID = v_id;
+    BEGIN
+        WHILE v_id IS NOT NULL LOOP
+            SELECT nombre, padreID INTO v_nombre, v_padre
+            FROM DivisionesGeograficas
+            WHERE divisionID = v_id;
 
-        v_text := v_nombre || ', ' || v_text;
-        v_id := v_padre;
-    END LOOP;
+            v_text := v_nombre || ', ' || v_text;
+            v_id := v_padre;
+        END LOOP;
 
-    NEW.direccionCompleta :=
-        TRIM(v_text) || ' ' ||
-        COALESCE(NEW.calle,'') || ' ' ||
-        COALESCE(NEW.numero,'') || ' ' ||
-        COALESCE(NEW.referencia,'');
+        NEW.direccionCompleta :=
+            TRIM(v_text) || ' ' ||
+            COALESCE(NEW.calle,'') || ' ' ||
+            COALESCE(NEW.numero,'') || ' ' ||
+            COALESCE(NEW.referencia,'');
 
-    RETURN NEW;
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'Direcciones','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -157,48 +196,63 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION fn_validar_monedas()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.moneda1ID = NEW.moneda2ID THEN
-        RAISE EXCEPTION 'Monedas iguales no permitidas';
-    END IF;
-    RETURN NEW;
+    BEGIN
+        IF NEW.moneda1ID = NEW.moneda2ID THEN
+            RAISE EXCEPTION 'Monedas iguales no permitidas';
+        END IF;
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'TiposCambio','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION fn_historial_tipo_cambio()
 RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE HistorialCambiosMonedas
-    SET fechaFin = CURRENT_TIMESTAMP
-    WHERE tipoCambioID = OLD.tipoCambioID
-    AND fechaFin = '9999-12-31';
+    BEGIN
+        UPDATE HistorialCambiosMonedas
+        SET fechaFin = CURRENT_TIMESTAMP
+        WHERE tipoCambioID = OLD.tipoCambioID
+        AND fechaFin = '9999-12-31';
 
-    INSERT INTO HistorialCambiosMonedas(
-        moneda1ID, moneda2ID, tipoCambioID,
-        usuarioModificacion, fechaInicio, fechaFin, tipoCambio
-    )
-    VALUES (
-        NEW.moneda1ID, NEW.moneda2ID, NEW.tipoCambioID,
-        NEW.usuarioModificacion, CURRENT_TIMESTAMP,
-        '9999-12-31', NEW.tipoCambio
-    );
+        INSERT INTO HistorialCambiosMonedas(
+            moneda1ID, moneda2ID, tipoCambioID,
+            usuarioModificacion, fechaInicio, fechaFin, tipoCambio
+        )
+        VALUES (
+            NEW.moneda1ID, NEW.moneda2ID, NEW.tipoCambioID,
+            NEW.usuarioModificacion, CURRENT_TIMESTAMP,
+            '9999-12-31', NEW.tipoCambio
+        );
 
-    RETURN NEW;
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'TiposCambio','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
 -- =========================================
--- 9. ORDENES AUTOMÁTICAS
+-- 9. ORDENES
 -- =========================================
 CREATE OR REPLACE FUNCTION fn_post_orden()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO Transacciones(monedaID,usuarioModificacion,tipoID,estadoTransaccionID,ordenID,monto)
-    VALUES (1,NEW.usuarioModificacion,1,1,NEW.ordenID,NEW.precioFinal);
+    BEGIN
+        INSERT INTO Transacciones(monedaID,usuarioModificacion,tipoID,estadoTransaccionID,ordenID,monto)
+        VALUES (1,NEW.usuarioModificacion,1,1,NEW.ordenID,NEW.precioFinal);
 
-    INSERT INTO EstadosCuenta(ordenID,usuarioModificacion,tipoMovimiento,estado,monto)
-    VALUES (NEW.ordenID,NEW.usuarioModificacion,'Debito','pendiente',NEW.precioFinal);
+        INSERT INTO EstadosCuenta(ordenID,usuarioModificacion,tipoMovimiento,estado,monto)
+        VALUES (NEW.ordenID,NEW.usuarioModificacion,'Debito','pendiente',NEW.precioFinal);
 
-    RETURN NEW;
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'Ordenes','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -208,20 +262,55 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION fn_actualizar_balance()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.estado='completado' THEN
-        UPDATE BalanceNeto
-        SET saldo = saldo + NEW.monto,
-            ultimaActualizacion = CURRENT_TIMESTAMP;
-    END IF;
-    RETURN NEW;
+    BEGIN
+        IF NEW.estado='completado' THEN
+            UPDATE BalanceNeto
+            SET saldo = saldo + NEW.monto,
+                ultimaActualizacion = CURRENT_TIMESTAMP;
+        END IF;
+
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'EstadosCuenta','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
 END;
 $$ LANGUAGE plpgsql;
 
 -- =========================================
--- 11. TRIGGERS DINÁMICOS
+-- 11. CHECKSUMS
+-- =========================================
+CREATE OR REPLACE FUNCTION fn_checksum_transacciones()
+RETURNS TRIGGER AS $$
+BEGIN
+    BEGIN
+        NEW.checksum := md5(NEW.monedaID||'|'||NEW.tipoID||'|'||NEW.estadoTransaccionID||'|'||NEW.ordenID||'|'||NEW.monto);
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'Transacciones','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION fn_checksum_estados_cuenta()
+RETURNS TRIGGER AS $$
+BEGIN
+    BEGIN
+        NEW.checksum := md5(NEW.ordenID||'|'||NEW.tipoMovimiento||'|'||NEW.estado||'|'||NEW.monto);
+        RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM fn_insert_log(NEW.usuarioModificacion,'EstadosCuenta','ERROR',NULL,NULL,NULL,SQLERRM);
+        RAISE;
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================
+-- 12. TRIGGERS DINÁMICOS
 -- =========================================
 DO $$
-DECLARE r RECORD; v_exists INT;
+DECLARE r RECORD;
 BEGIN
     FOR r IN
         SELECT table_name
@@ -229,95 +318,17 @@ BEGIN
         WHERE column_name='usuarioModificacion'
         AND table_schema='public'
     LOOP
-        SELECT COUNT(*) INTO v_exists FROM pg_trigger WHERE tgname='trg_log_'||r.table_name;
-
-        IF v_exists=0 THEN
-            EXECUTE format('
-                CREATE TRIGGER trg_log_%I
-                AFTER INSERT OR UPDATE OR DELETE ON %I
-                FOR EACH ROW EXECUTE FUNCTION fn_trigger_log();
-            ',r.table_name,r.table_name);
-        END IF;
-
-        SELECT COUNT(*) INTO v_exists FROM pg_trigger WHERE tgname='trg_login_'||r.table_name;
-
-        IF v_exists=0 THEN
-            EXECUTE format('
-                CREATE TRIGGER trg_login_%I
-                AFTER INSERT OR UPDATE ON %I
-                FOR EACH ROW EXECUTE FUNCTION fn_update_last_login();
-            ',r.table_name,r.table_name);
-        END IF;
+        EXECUTE format('CREATE TRIGGER trg_log_%I AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION fn_trigger_log();',r.table_name,r.table_name);
+        EXECUTE format('CREATE TRIGGER trg_login_%I AFTER INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION fn_update_last_login();',r.table_name,r.table_name);
     END LOOP;
 END;
 $$;
 
 -- =========================================
--- 12. CHECKSUM ESPECÍFICOS
+-- 13. TRIGGERS ESPECÍFICOS
 -- =========================================
-
--- TiposCambio
-CREATE FUNCTION fn_checksum_tipos_cambio() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(NEW.moneda1ID||'|'||NEW.moneda2ID||'|'||NEW.tipoCambio);
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_checksum_tiposCambio BEFORE INSERT OR UPDATE ON TiposCambio FOR EACH ROW EXECUTE FUNCTION fn_checksum_tipos_cambio();
-
--- Historial
-CREATE FUNCTION fn_checksum_historial() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(NEW.moneda1ID||'|'||NEW.moneda2ID||'|'||NEW.tipoCambioID||'|'||NEW.tipoCambio);
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_checksum_historial BEFORE INSERT OR UPDATE ON HistorialCambiosMonedas FOR EACH ROW EXECUTE FUNCTION fn_checksum_historial();
-
--- OrdenDetalles
-CREATE FUNCTION fn_checksum_orden_detalles() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(
-        NEW.ordenID||'|'||NEW.loteID||'|'||
-        NEW.impuestoID||'|'||NEW.permisoID||'|'||
-        NEW.cantidad||'|'||
-        COALESCE(NEW.descuento,0)||'|'||
-        COALESCE(NEW.costoEnvio,0)
-    );
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_checksum_ordenDetalles BEFORE INSERT OR UPDATE ON OrdenDetalles FOR EACH ROW EXECUTE FUNCTION fn_checksum_orden_detalles();
-
--- Transacciones
-CREATE FUNCTION fn_checksum_transacciones() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(NEW.monedaID||'|'||NEW.tipoID||'|'||NEW.estadoTransaccionID||'|'||NEW.ordenID||'|'||NEW.monto);
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_checksum_transacciones BEFORE INSERT OR UPDATE ON Transacciones FOR EACH ROW EXECUTE FUNCTION fn_checksum_transacciones();
-
--- EstadosCuenta
-CREATE FUNCTION fn_checksum_estados_cuenta() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(NEW.ordenID||'|'||NEW.tipoMovimiento||'|'||NEW.estado||'|'||NEW.monto);
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_checksum_estadosCuenta BEFORE INSERT OR UPDATE ON EstadosCuenta FOR EACH ROW EXECUTE FUNCTION fn_checksum_estados_cuenta();
-
--- Logs
-CREATE FUNCTION fn_checksum_logs() RETURNS TRIGGER AS $$
-BEGIN
-    NEW.checksum := md5(
-        COALESCE(NEW.usuarioModificacion,0)||'|'||
-        NEW.tablaID||'|'||
-        NEW.accionID||'|'||
-        NEW.objetoAfectadoID
-    );
-    RETURN NEW;
-END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_checksum_logs BEFORE INSERT ON Logs FOR EACH ROW EXECUTE FUNCTION fn_checksum_logs();
-
--- =========================================
--- 13. TRIGGERS RESTANTES
--- =========================================
 
 CREATE TRIGGER trg_validar_direccion BEFORE INSERT OR UPDATE ON Direcciones FOR EACH ROW EXECUTE FUNCTION fn_validar_division();
 CREATE TRIGGER trg_generar_direccion BEFORE INSERT OR UPDATE ON Direcciones FOR EACH ROW EXECUTE FUNCTION fn_generar_direccion();
