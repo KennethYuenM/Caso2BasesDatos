@@ -2,6 +2,36 @@ DROP DATABASE IF EXISTS dynamicBrandsDB;
 CREATE DATABASE dynamicBrandsDB;
 USE dynamicBrandsDB;
 
+CREATE TABLE generalLog (
+    generalLogID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tableName VARCHAR(60) NOT NULL,
+    recordID BIGINT NULL,
+    recordCode VARCHAR(80) NULL,
+    actionType VARCHAR(30) NOT NULL,
+    fieldName VARCHAR(60) NULL,
+    oldValue TEXT NULL,
+    newValue TEXT NULL,
+    changeDetails VARCHAR(500) NULL,
+    changeSourceCode VARCHAR(30) NOT NULL,
+    performedByUserID BIGINT NULL,
+    performedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_generalLog_tableName (tableName),
+    KEY idx_generalLog_recordID (recordID),
+    KEY idx_generalLog_recordCode (recordCode),
+    KEY idx_generalLog_actionType (actionType),
+    KEY idx_generalLog_changeSourceCode (changeSourceCode),
+    KEY idx_generalLog_performedByUserID (performedByUserID),
+    CONSTRAINT fk_generalLog_changeSourceCode
+        FOREIGN KEY (changeSourceCode) REFERENCES changeSource(sourceCode)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_generalLog_performedByUserID
+        FOREIGN KEY (performedByUserID) REFERENCES userInfo(userID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+) ENGINE=InnoDB;
+
 CREATE TABLE currency (
     currencyID BIGINT AUTO_INCREMENT PRIMARY KEY,
     currencyCode VARCHAR(20) NOT NULL,
