@@ -6,6 +6,21 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 
 # tables
 
+## generalLog
+- generalLogID PK
+- tableName varchar 60
+- recordID bigint
+- recordCode varchar 80
+- actionType varchar 30
+- fieldName varchar 60
+- oldValue text
+- newValue text
+- changeDetails varchar 500
+- changeSourceCode varchar 30
+- performedByUserID bigint
+- performedAt timestamp
+- createdAt timestamp
+
 ## currency
 - currencyID PK
 - currencyCode varchar 20
