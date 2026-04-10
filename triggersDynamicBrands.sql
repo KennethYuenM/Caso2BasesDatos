@@ -3,6 +3,44 @@ USE dynamicBrandsDB;
 DELIMITER $$
 
 -- =========================================================
+-- CONSISTENCY TRIGGERS
+-- =========================================================
+
+DROP TRIGGER IF EXISTS trg_bi_customerOrder_calc_total $$
+CREATE TRIGGER trg_bi_customerOrder_calc_total
+BEFORE INSERT ON customerOrder
+FOR EACH ROW
+BEGIN
+    SET NEW.totalAmount = ROUND(NEW.subTotal + NEW.taxTotal + NEW.shippingAmount, 6);
+END $$
+
+DROP TRIGGER IF EXISTS trg_bu_customerOrder_calc_total $$
+CREATE TRIGGER trg_bu_customerOrder_calc_total
+BEFORE UPDATE ON customerOrder
+FOR EACH ROW
+BEGIN
+    SET NEW.totalAmount = ROUND(NEW.subTotal + NEW.taxTotal + NEW.shippingAmount, 6);
+END $$
+
+DROP TRIGGER IF EXISTS trg_bi_inventory_calc_sellable $$
+CREATE TRIGGER trg_bi_inventory_calc_sellable
+BEFORE INSERT ON inventory
+FOR EACH ROW
+BEGIN
+    SET NEW.sellableQuantity = NEW.availableQuantity - NEW.reservedQuantity;
+    SET NEW.lastStockUpdateAt = CURRENT_TIMESTAMP;
+END $$
+
+DROP TRIGGER IF EXISTS trg_bu_inventory_calc_sellable $$
+CREATE TRIGGER trg_bu_inventory_calc_sellable
+BEFORE UPDATE ON inventory
+FOR EACH ROW
+BEGIN
+    SET NEW.sellableQuantity = NEW.availableQuantity - NEW.reservedQuantity;
+    SET NEW.lastStockUpdateAt = CURRENT_TIMESTAMP;
+END $$
+
+-- =========================================================
 -- DYNAMIC SITE INFO
 -- =========================================================
 
@@ -53,7 +91,8 @@ BEGIN
             'brandCode=', NEW.brandCode,
             '; countryID=', NEW.countryID,
             '; currencyID=', NEW.currencyID,
-            '; siteStatusCode=', NEW.siteStatusCode
+            '; siteStatusCode=', NEW.siteStatusCode,
+            '; primaryDomainName=', NEW.primaryDomainName
         ),
         'New dynamic site created',
         'SYSTEM',
@@ -68,6 +107,8 @@ CREATE TRIGGER trg_au_dynamicSiteInfo
 AFTER UPDATE ON dynamicSiteInfo
 FOR EACH ROW
 BEGIN
+    DECLARE v_has_changes BOOLEAN DEFAULT FALSE;
+
     IF OLD.siteStatusCode <> NEW.siteStatusCode THEN
         INSERT INTO dynamicSiteStatusLog (
             dynamicSiteID,
@@ -85,23 +126,6 @@ BEGIN
             NEW.siteStatusCode,
             CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode),
             'SYSTEM',
-            NULL,
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
-        );
-
-        INSERT INTO dynamicSiteAuditLog (
-            dynamicSiteID,
-            eventTypeCode,
-            eventDetails,
-            performedByUserID,
-            performedAt,
-            createdAt
-        )
-        VALUES (
-            NEW.dynamicSiteID,
-            'SITE_UPDATED',
-            CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode),
             NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -126,6 +150,8 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.siteName <> NEW.siteName THEN
@@ -148,6 +174,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.brandCode <> NEW.brandCode THEN
@@ -170,6 +197,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.countryID <> NEW.countryID THEN
@@ -192,6 +220,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.currencyID <> NEW.currencyID THEN
@@ -214,6 +243,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.primaryDomainName <> NEW.primaryDomainName THEN
@@ -236,6 +266,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF IFNULL(OLD.marketingFocus, '') <> IFNULL(NEW.marketingFocus, '') THEN
@@ -258,6 +289,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF IFNULL(OLD.brandVoice, '') <> IFNULL(NEW.brandVoice, '') THEN
@@ -280,6 +312,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF IFNULL(OLD.targetSegment, '') <> IFNULL(NEW.targetSegment, '') THEN
@@ -302,6 +335,53 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
+    END IF;
+
+    IF IFNULL(CAST(OLD.launchDate AS CHAR), '') <> IFNULL(CAST(NEW.launchDate AS CHAR), '') THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'dynamicSiteInfo',
+            NEW.dynamicSiteID,
+            NEW.siteCode,
+            'UPDATE',
+            'launchDate',
+            CAST(OLD.launchDate AS CHAR),
+            CAST(NEW.launchDate AS CHAR),
+            'Dynamic site launch date updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+        SET v_has_changes = TRUE;
+    END IF;
+
+    IF IFNULL(CAST(OLD.closeDate AS CHAR), '') <> IFNULL(CAST(NEW.closeDate AS CHAR), '') THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'dynamicSiteInfo',
+            NEW.dynamicSiteID,
+            NEW.siteCode,
+            'UPDATE',
+            'closeDate',
+            CAST(OLD.closeDate AS CHAR),
+            CAST(NEW.closeDate AS CHAR),
+            'Dynamic site close date updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF IFNULL(OLD.clientName, '') <> IFNULL(NEW.clientName, '') THEN
@@ -324,6 +404,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF IFNULL(OLD.logoURL, '') <> IFNULL(NEW.logoURL, '') THEN
@@ -346,6 +427,7 @@ BEGIN
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        SET v_has_changes = TRUE;
     END IF;
 
     IF OLD.isActive <> NEW.isActive THEN
@@ -363,6 +445,106 @@ BEGIN
             CAST(OLD.isActive AS CHAR),
             CAST(NEW.isActive AS CHAR),
             'Dynamic site active flag updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+        SET v_has_changes = TRUE;
+    END IF;
+
+    IF v_has_changes THEN
+        INSERT INTO dynamicSiteAuditLog (
+            dynamicSiteID,
+            eventTypeCode,
+            eventDetails,
+            performedByUserID,
+            performedAt,
+            createdAt
+        )
+        VALUES (
+            NEW.dynamicSiteID,
+            'SITE_UPDATED',
+            CONCAT('Dynamic site updated. siteCode=', NEW.siteCode),
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+END $$
+
+-- =========================================================
+-- DYNAMIC SITE AI GENERATION
+-- =========================================================
+
+DROP TRIGGER IF EXISTS trg_ai_dynamicSiteAIGeneration $$
+CREATE TRIGGER trg_ai_dynamicSiteAIGeneration
+AFTER INSERT ON dynamicSiteAIGeneration
+FOR EACH ROW
+BEGIN
+    INSERT INTO generalLog (
+        tableName, recordID, recordCode, actionType, fieldName,
+        oldValue, newValue, changeDetails, changeSourceCode,
+        performedByUserID, performedAt, createdAt
+    )
+    VALUES (
+        'dynamicSiteAIGeneration',
+        NEW.dynamicSiteAIGenerationID,
+        NULL,
+        'INSERT',
+        'generationStatusCode',
+        NULL,
+        NEW.generationStatusCode,
+        CONCAT('AI generation created for dynamicSiteID=', NEW.dynamicSiteID),
+        'SYSTEM',
+        NULL,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+    );
+END $$
+
+DROP TRIGGER IF EXISTS trg_au_dynamicSiteAIGeneration $$
+CREATE TRIGGER trg_au_dynamicSiteAIGeneration
+AFTER UPDATE ON dynamicSiteAIGeneration
+FOR EACH ROW
+BEGIN
+    IF OLD.generationStatusCode <> NEW.generationStatusCode THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'dynamicSiteAIGeneration',
+            NEW.dynamicSiteAIGenerationID,
+            NULL,
+            'STATUS_CHANGE',
+            'generationStatusCode',
+            OLD.generationStatusCode,
+            NEW.generationStatusCode,
+            'AI generation status updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    IF IFNULL(OLD.generationDetails, '') <> IFNULL(NEW.generationDetails, '') THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'dynamicSiteAIGeneration',
+            NEW.dynamicSiteAIGenerationID,
+            NULL,
+            'UPDATE',
+            'generationDetails',
+            OLD.generationDetails,
+            NEW.generationDetails,
+            'AI generation details updated',
             'SYSTEM',
             NULL,
             CURRENT_TIMESTAMP,
@@ -579,6 +761,28 @@ BEGIN
             CURRENT_TIMESTAMP
         );
     END IF;
+
+    IF OLD.exchangeRate <> NEW.exchangeRate THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'customerOrder',
+            NEW.customerOrderID,
+            NEW.orderCode,
+            'UPDATE',
+            'exchangeRate',
+            CAST(OLD.exchangeRate AS CHAR),
+            CAST(NEW.exchangeRate AS CHAR),
+            'Customer order exchange rate updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
 END $$
 
 -- =========================================================
@@ -684,6 +888,86 @@ BEGIN
 END $$
 
 -- =========================================================
+-- PRODUCT PRICE
+-- =========================================================
+
+DROP TRIGGER IF EXISTS trg_ai_productPrice $$
+CREATE TRIGGER trg_ai_productPrice
+AFTER INSERT ON productPrice
+FOR EACH ROW
+BEGIN
+    INSERT INTO generalLog (
+        tableName, recordID, recordCode, actionType, fieldName,
+        oldValue, newValue, changeDetails, changeSourceCode,
+        performedByUserID, performedAt, createdAt
+    )
+    VALUES (
+        'productPrice',
+        NEW.productPriceID,
+        NULL,
+        'INSERT',
+        'priceAmount',
+        NULL,
+        CAST(NEW.priceAmount AS CHAR),
+        CONCAT('Product price created for productID=', NEW.productID, ', currencyID=', NEW.currencyID),
+        'SYSTEM',
+        NULL,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+    );
+END $$
+
+DROP TRIGGER IF EXISTS trg_au_productPrice $$
+CREATE TRIGGER trg_au_productPrice
+AFTER UPDATE ON productPrice
+FOR EACH ROW
+BEGIN
+    IF OLD.priceAmount <> NEW.priceAmount THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'productPrice',
+            NEW.productPriceID,
+            NULL,
+            'UPDATE',
+            'priceAmount',
+            CAST(OLD.priceAmount AS CHAR),
+            CAST(NEW.priceAmount AS CHAR),
+            'Product price amount updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    IF OLD.isCurrent <> NEW.isCurrent THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'productPrice',
+            NEW.productPriceID,
+            NULL,
+            'UPDATE',
+            'isCurrent',
+            CAST(OLD.isCurrent AS CHAR),
+            CAST(NEW.isCurrent AS CHAR),
+            'Product price current flag updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+END $$
+
+-- =========================================================
 -- INVENTORY
 -- =========================================================
 
@@ -710,7 +994,7 @@ BEGIN
             '; sellable=', NEW.sellableQuantity
         ),
         CONCAT('Inventory created for dynamicSiteID=', NEW.dynamicSiteID, ', productID=', NEW.productID),
-        NEW.sourceCode,
+        'SYSTEM',
         NULL,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -737,7 +1021,7 @@ BEGIN
             CAST(OLD.availableQuantity AS CHAR),
             CAST(NEW.availableQuantity AS CHAR),
             'Inventory available quantity updated',
-            NEW.sourceCode,
+            'SYSTEM',
             NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -759,7 +1043,7 @@ BEGIN
             CAST(OLD.reservedQuantity AS CHAR),
             CAST(NEW.reservedQuantity AS CHAR),
             'Inventory reserved quantity updated',
-            NEW.sourceCode,
+            'SYSTEM',
             NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -781,7 +1065,7 @@ BEGIN
             CAST(OLD.sellableQuantity AS CHAR),
             CAST(NEW.sellableQuantity AS CHAR),
             'Inventory sellable quantity updated',
-            NEW.sourceCode,
+            'SYSTEM',
             NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -803,7 +1087,7 @@ BEGIN
             CAST(OLD.reorderLevel AS CHAR),
             CAST(NEW.reorderLevel AS CHAR),
             'Inventory reorder level updated',
-            NEW.sourceCode,
+            'SYSTEM',
             NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -830,10 +1114,10 @@ BEGIN
         NEW.paymentTransactionID,
         NEW.transactionCode,
         'INSERT',
-        NULL,
+        'paymentStatusCode',
         NULL,
         NEW.paymentStatusCode,
-        CONCAT('Payment transaction created with provider ', NEW.providerCode),
+        CONCAT('Payment transaction created. providerCode=', NEW.providerCode),
         'SYSTEM',
         NULL,
         CURRENT_TIMESTAMP,
@@ -911,6 +1195,28 @@ BEGIN
             CURRENT_TIMESTAMP
         );
     END IF;
+
+    IF IFNULL(OLD.providerReference, '') <> IFNULL(NEW.providerReference, '') THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'paymentTransaction',
+            NEW.paymentTransactionID,
+            NEW.transactionCode,
+            'UPDATE',
+            'providerReference',
+            OLD.providerReference,
+            NEW.providerReference,
+            'Payment provider reference updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
 END $$
 
 -- =========================================================
@@ -932,7 +1238,7 @@ BEGIN
         NEW.shipmentID,
         NEW.shipmentCode,
         'INSERT',
-        NULL,
+        'shipmentStatusCode',
         NULL,
         NEW.shipmentStatusCode,
         CONCAT('Shipment created for customerOrderID=', NEW.customerOrderID),
@@ -1014,7 +1320,7 @@ BEGIN
         );
     END IF;
 
-    IF IFNULL(OLD.shippedAt, '1000-01-01 00:00:00') <> IFNULL(NEW.shippedAt, '1000-01-01 00:00:00') THEN
+    IF IFNULL(CAST(OLD.shippedAt AS CHAR), '') <> IFNULL(CAST(NEW.shippedAt AS CHAR), '') THEN
         INSERT INTO generalLog (
             tableName, recordID, recordCode, actionType, fieldName,
             oldValue, newValue, changeDetails, changeSourceCode,
@@ -1036,7 +1342,7 @@ BEGIN
         );
     END IF;
 
-    IF IFNULL(OLD.deliveredAt, '1000-01-01 00:00:00') <> IFNULL(NEW.deliveredAt, '1000-01-01 00:00:00') THEN
+    IF IFNULL(CAST(OLD.deliveredAt AS CHAR), '') <> IFNULL(CAST(NEW.deliveredAt AS CHAR), '') THEN
         INSERT INTO generalLog (
             tableName, recordID, recordCode, actionType, fieldName,
             oldValue, newValue, changeDetails, changeSourceCode,
@@ -1078,7 +1384,7 @@ BEGIN
         NEW.countryProductPermissionID,
         NEW.permissionCode,
         'INSERT',
-        NULL,
+        'permissionStatusCode',
         NULL,
         NEW.permissionStatusCode,
         CONCAT('Permission created for productID=', NEW.productID, ', countryID=', NEW.countryID),
@@ -1138,7 +1444,29 @@ BEGIN
         );
     END IF;
 
-    IF IFNULL(OLD.expiresAt, '1000-01-01 00:00:00') <> IFNULL(NEW.expiresAt, '1000-01-01 00:00:00') THEN
+    IF IFNULL(CAST(OLD.issuedAt AS CHAR), '') <> IFNULL(CAST(NEW.issuedAt AS CHAR), '') THEN
+        INSERT INTO generalLog (
+            tableName, recordID, recordCode, actionType, fieldName,
+            oldValue, newValue, changeDetails, changeSourceCode,
+            performedByUserID, performedAt, createdAt
+        )
+        VALUES (
+            'countryProductPermission',
+            NEW.countryProductPermissionID,
+            NEW.permissionCode,
+            'UPDATE',
+            'issuedAt',
+            CAST(OLD.issuedAt AS CHAR),
+            CAST(NEW.issuedAt AS CHAR),
+            'Permission issuedAt updated',
+            'SYSTEM',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    IF IFNULL(CAST(OLD.expiresAt AS CHAR), '') <> IFNULL(CAST(NEW.expiresAt AS CHAR), '') THEN
         INSERT INTO generalLog (
             tableName, recordID, recordCode, actionType, fieldName,
             oldValue, newValue, changeDetails, changeSourceCode,
