@@ -7,9 +7,10 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 
 # Tables:
 
+/*---------------Seguridad y acceso---------------*/
 ## Usuarios
 - usuarioID (PK)
-- nombre varchar(50)
+- nombreUsuario varchar(50)
 - apellido varchar(50)
 - segundoApellido varchar(50)
 - email varchar(100)
@@ -30,6 +31,17 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - roleID (FK)
 - asignado timestamp
 
+## PermisosSistema
+- permisoID (PK)
+- nombrePermiso varchar (30)
+- descripcion varchar (200)
+
+## PermisosXRole
+- roleID (FK)
+- permisoID (FK)
+
+/*---------------Auditoria y Sistema---------------*/
+
 (Crear un script par que cree todas las tablas del proyecto)
 ## Tablas (por tablas me refiero a todas la tablas del proyecto)
 - tablaID (PK)
@@ -40,24 +52,30 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - accionID (PK)
 - nombreAccion varchar(10) (CREATE, READ, UPDATE, DELETE)
 
-## PermisosSistema
-- permisoID (PK)
+(todo lo que se haga en la base de datos, cada insercion y actualizacion debe pasar por logs con scipts, incluyendo los cualquier begin y exception)
+## Logs
+- logID (PK)
+- usuarioModificacion (FK) (puede ser nulo en ciertos casos)
 - tablaID (FK)
 - accionID (FK)
+- objetoAfectadoID int
+- datosViejos JSON
+- datosNuevos JSON
+- hora timestamp
+- error text
+- checksum text
 
-## PermisosXRole
-- roleID (FK)
-- permisoID (FK)
+/*---------------Geografía y Direcciones---------------*/
 
 ## Paises
 - paisID (PK)  
-- nombre varchar(30)
+- nombrePais varchar(30)
 - codigoISO varchar (3)
 - activo boolean
 
 ## NivelesGeograficos
 - nivelID (PK)
-- nombre varchar(50)
+- nombreNGeografico varchar(50)
 - orden int (Jerarquía 1 = más alto después del país)
 - activo boolean
 
@@ -74,29 +92,30 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - usuarioModificacion (FK) (Usuario que insertó la direccion)
 - calle varchar (150)
 - número varchar(20)
+- geoposicion geography
 - referencia varchar(500)
 - codigoPostal varchar(20)
 - direccionCompleta text (Generado automáticamente en el script, hagarrando los datos de division id y creando un texto pasando por todas las autoreferencias hasta llegar al nivelID es 1, a demas de calle, número y referencia)
 - fechaCreacion timestamp
 - activo boolean
 
-## CentrosLogisticos
-- centroLogisticoID (PK)
-- tipoID (FK)
-- direccionID (FK) (Direccion principal, pero unica de un centro de distribución)
-- usuarioModificacion (FK)
-- nombre varchar(50)
-- telefono varchar(20)
-- activo boolean
-
-## ContactosProveedor
-- centroLogisticoID (FK)
-- contactoID (FK)
-- activo boolean
+/*---------------Logistica---------------*/
 
 ## TiposCentroLogistico
 - tipoID (PK)
-- nombre varchar(20) (Puerto, Aeropuerto, Empresa Repartidora)
+- nombreTipoCLogistico varchar(20) (Puerto, Aeropuerto, Empresa Repartidora)
+
+## CentrosLogisticos
+- centroLogisticoID (PK)
+- tipoID (FK)
+- direccionID (FK)
+- contactoID (FK)
+- usuarioModificacion (FK)
+- nombreCentroLogistico varchar(50)
+- telefono varchar(20)
+- activo boolean
+
+/*---------------Monedas---------------*/
 
 ## Monedas
 - monedaID (PK)
@@ -111,7 +130,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - tipoCambioID (PK)
 - usuarioModificacion (FK)
 - moneda1ID (FK)
-- moneda2ID (FK) (validar con trigger que moneda 1 y 2 no sean iguales y un try cath)
+- moneda2ID (FK) (validar con check que moneda 1 y 2 no sean iguales y un try cath)
 - tipoCambio decimal(18,6)
 - tiempoCreacion timestamp
 - ultimaActualizacion timestamp
@@ -132,49 +151,46 @@ ademas de actualizar la anterior fechaFin)
 - checksum varchar(100)
 - horaCambio timestamp
 
-(todo lo que se haga en la base de datos, cada insercion y actualizacion debe pasar por logs con scipts, incluyendo los cualquier begin y exception)
-## Logs
-- logID (PK)
-- usuarioModificacion (FK) (puede ser nulo en ciertos casos)
-- tablaID (FK)
-- accionID (FK)
-- objetoAfectadoID int
-- datosViejos JSON
-- datosNuevos JSON
-- hora timestamp
-- error text
-- checksum text
-
-(investigando, cada país tiene su forma de cobrar y sumar los premisos, para simplificarlo
-simplemente tiene un campo, que seria el cobro por el tramite por producto)
-## PermisosImportacion 
-- permisoID (PK)
-- paisID (FK)
-- tipoPermisoID (FK)
-- usuarioModificacion (FK)
-- nombrePermiso varchar(20)
-- costo decimal(18,6)
-- activo boolean
+/*---------------Permisos de Importacion---------------*/
 
 ## TiposPermisos
 - tipoPermisoID (FK)
 - nombreTipoPermiso varchar(20)
 
+## PermisosImportacion 
+- permisoID (PK)
+- paisID (FK)
+- tipoPermisoID (FK)
+- usuarioModificacion (FK)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6) 
+- nombrePermiso varchar(20)
+- descripcion varchar(200)
+- urlDocumentacion text
+- costo decimal(18,6)
+- activo boolean
+
+/*---------------Productos---------------*/
+
+## Categorias
+- categoriaID (PK)
+- nombreCategoriaP varchar(20)
+- activo boolean
 
 ## Productos
 - productoID (PK)
 - categoriaID (FK)
 - usuarioModificacion (FK)
 - proveedorID (FK)
-- nombre varchar(40)
+- nombreProducto varchar(40)
 - descripcion varchar(200)
 - descripcionManejo varchar(200)
 - activo boolean
 
-## Categorias
-- categoriaID (PK)
-- nombre varchar(20)
-- activo boolean
+## Caracteristicas
+- caracteristicaID (PK)
+- nombreCaracteristicaP varchar(50)
 
 ## ValorCaracteristicas
 - productoID: FK
@@ -182,24 +198,12 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 - valor: varchar(50)
 - deleted: boolean
 
-## Caracteristicas
-- caracteristicaID (PK)
-- nombre varchar(50)
+/*---------------Proveedores y Contactos---------------*/
 
 ## Proveedores
 - proveedorID (PK)
 - direccionID (FK)
-- nombre varchar(50)
-- activo boolean
-
-## Contactos
-- contactoID (PK)
-- usuarioModificacion (FK)
-- nombre varchar(50)
-- apellido varchar(50)
-- segundoApellido varchar(50)
-- email varchar(100)
-- número varchar (20)
+- nombreProveedor varchar(50)
 - activo boolean
 
 ## ContactosProveedor
@@ -207,25 +211,98 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 - contactoID (FK)
 - activo boolean
 
-## Lotes (nota, lotes ya es en si un hitorial de precios)
+## TiposContactos
+- tipoContactoID (PK)
+- nombreTipoContacto varchar(20)
+
+## Contactos
+- contactoID (PK)
+- tipoContactoID (FK)
+- usuarioModificacion (FK)
+- nombreContacto varchar(50)
+- apellido varchar(50)
+- segundoApellido varchar(50)
+- activo boolean
+
+## TiposTelefonos (casa, trabajo, personal)
+- tipoTelefonoID (PK)
+- nombreTipoTelefono varchar(20)
+
+## TelefonosContactos
+- telefonoContactoID (PK)
+- contactoID (FK)
+- tipoTelefonosID (FK)
+- usuarioModificacion (FK)
+- numeroContacto varchar (20)
+- activo boolean
+
+## CorreosContactos
+- correoCantactoID (PK)
+- contactoID (FK)
+- usuarioModificacion (FK)
+- correo varchar (50)
+- activo boolean
+
+/*---------------Inventario y Lotes---------------*/
+
+## Lotes
 - loteID (PK)
 - productoID (FK)
-- precio decimal(18,6)
-- ingredientes varchar(500)
+- cantidadProductoLoteInicial int
+- cantidadProductoLoteDisponible int
 - fechaFabricacion timestamp
 - fechaVencimiento timestamp (puede ser nulo)
 
+## tipoMovimientosInvetariosID
+- tipoMovimientoInvetarioID (PK)
+- nombreTipoMovimientoInventario varchar (20)
+
+## MovimientosInventario
+- movimientoID (PK)
+- loteID (FK)
+- usuarioModificacion (FK)
+- tipoMovimientoInvetarioID (FK)
+- cantidad int
+- fecha timestamp
+
+## Inventarios
+- inventarioID (PK)
+- loteID (FK)
+- usuarioModificacion (FK)
+- cantidadDisponible int
+- ultimaActualizacion timestamp
+
+/*---------------Precios---------------*/
+
+## HistorialPreciosProducto
+- historialPrecioID (PK)
+- productoID (FK)
+- precio decimal(18,6)
+- monedaID (FK)
+- fechaInicio timestamp
+- fechaFin timestamp
+- activo boolean
+
+/*---------------Ordenes---------------*/
+
 ## EstadosOrdenes
 - estadoID (PK)
-- nombre varchar(10)
+- nombreEstadoOrden varchar(10)
+
+## TiposOrden
+- tipoOrdenID (PK)
+- nombre varchar(20)
 
 ## Ordenes
-- ordenID (PK) (es necesario agregar codigoOrden, o se puede dejar solo con el id?)
+- ordenID (PK) 
 - estadoID (FK)
+- tipoOrdenID (FK)
 - usuarioModificacion (FK)
 - direccionEnvioID (FK)
 - direccionEntregaID (FK)
-- tipoOrden enum(venta, compra)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6)
 - numeroOrden varchar(30)
 - precioFinal decimal(18,6) 
 - fecha timestamp
@@ -234,21 +311,34 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 ## OrdenDetalles
 - ordenDetalleID (PK)
 - ordenID (FK)
-- loteID (FK)
-- impuestoID (FK)
-- permisoID (FK) 
+- productoID (FK)
+- loteID (FK) (Verificar mendiante un trigger, a la hora de crear un orden detalle, que se escoja automaticamente el lote mas actiguo del producto, a demas de que si en ese lote hay menos productos disponibles del que se requiere, se cree automaticamente una ordendetalle nueva, con los mismos datos pero ajustando la cantidad segun corresponda, ademas de restar automaticamente en el lote o sumar segun el tipo del ordenID.TipoOrden)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6) 
 - cantidad int
 - descuento decimal(18,6)
 - costoEnvio decimal(18,6)
-- precioLoteFinal decimal(18,6) (se calcula con el ((costo del lote - descuento) + impuesto + permisos + costoEnvio)* cantidad)
+- precioLoteFinal decimal(18,6) (calcular, segun todos los impuestos, costos de permisos y descuentos meidante un trigger)
 - checksum text
 
-## ImpuestosPais
-- impuestoID (PK)
-- paisID (FK)
-- usuarioModificacion (FK)
-- porcentaje decimal(5,2)
-- activo boolean
+## OrdenDetalleImpuestos
+- ordenDetalleID (FK)
+- impuestoID (FK)
+
+## OrdenDetallePermisos
+- ordenDetalleID (FK)
+- permisoID (FK)
+
+## OrdenDetalleDescuentos
+- ordenDetalleID (FK)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6) 
+- descripcion varchar(100)
+- monto decimal(18,6)
+
+/*---------------Trazaabilidad De Ordenes---------------*/
 
 ## TrazabilidadOrden
 - trazabilidadID (PK)
@@ -259,6 +349,32 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 - estadoID (FK)
 - fecha timestamp
 
+/*---------------Impuestos---------------*/
+
+## ImpuestosPais
+- impuestoID (PK)
+- paisID (FK)
+- usuarioModificacion (FK)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6) 
+- nombre varchar(50)
+- valaor decimal(5,2)
+- tipo enum('porcentaje','monto_fijo')
+- fechaInicio timestamp
+- fechaFin timestamp
+- activo boolean
+
+/*---------------Transacciones y Finanzas---------------*/
+
+## EstadadoTransacciones
+- estadoTransaccionID (PK)
+- nombreEstadoTransac varchar(20)
+
+## TipoTransacciones
+- tipoID (PK)
+- nombreTipoTransac varchar(20)
+
 ## Transacciones
 - transaccionID (PK)
 - monedaID (FK)
@@ -266,33 +382,26 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 - tipoID (FK)
 - estadoTransaccionID (FK)
 - ordenID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6) 
 - monto decimal(18,6)
 - descripcion text
 - fecha timestamp
 - checksum text
 
-## EstadadoTransacciones
-- estadoTransaccionID (PK)
-- nombre varchar(20)
-
-## TipoTransacciones
-- tipoID (PK)
-- nombre varchar(20)
-
-## Inventarios
-- inventarioID (PK)
-- loteID (FK)
-- usuarioModificacion (FK)
-- cantidadDisponible int
-- ultimaActualizacion timestamp
+/*---------------Estados de Cuenta---------------*/
 
 (cada que se crea una orden, se crea automaticamente un estado de cuenta, cada que se actualiza un estado de cuenta en el apartado de estado, se actualiza el balance neto solamente si se cambia a comletado)
+
 ## EstadosCuenta
 - estadoCuentaID (PK)
 - ordenID (FK)
 - usuarioModificacion (FK)
 - tipoMovimiento enum ('Debito', 'Credito', segun el tipoOrden)
 - estado enum (pendiente, completado, cancelado)
+- monedaID (FK)
+- tipoCambioID (FK)
+- tipoCambio decimal(18,6)
 - monto decimal(18,6)
 - fechaRegistro timestamp
 - checksum text
@@ -302,4 +411,5 @@ simplemente tiene un campo, que seria el cobro por el tramite por producto)
 - saldo decimal(18,6)
 - ultimaActualización timestamp
 
+Todas las tablas FKs correctas NOT NULL en todo (excepto donde explícitamente aplica NULL) CHECK de monedas
 On deleted no action para las fk
