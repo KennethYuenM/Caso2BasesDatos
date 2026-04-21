@@ -2,7 +2,6 @@ DROP DATABASE IF EXISTS dynamicBrandsDB;
 CREATE DATABASE dynamicBrandsDB;
 USE dynamicBrandsDB;
 
-
 CREATE TABLE currency (
     currencyID BIGINT AUTO_INCREMENT PRIMARY KEY,
     currencyCode VARCHAR(20) NOT NULL,
@@ -33,36 +32,23 @@ CREATE TABLE country (
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
 
-CREATE TABLE exchangePair (
-    exchangePairID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    baseCurrencyID BIGINT NOT NULL,
-    quoteCurrencyID BIGINT NOT NULL,
-    isActive BOOLEAN NOT NULL DEFAULT TRUE,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_exchangePair_base_quote (baseCurrencyID, quoteCurrencyID),
-    KEY idx_exchangePair_baseCurrencyID (baseCurrencyID),
-    KEY idx_exchangePair_quoteCurrencyID (quoteCurrencyID),
-    CONSTRAINT fk_exchangePair_baseCurrencyID
-        FOREIGN KEY (baseCurrencyID) REFERENCES currency(currencyID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_exchangePair_quoteCurrencyID
-        FOREIGN KEY (quoteCurrencyID) REFERENCES currency(currencyID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
-) ENGINE=InnoDB;
-
 CREATE TABLE currentExchangeRate (
     currentExchangeRateID BIGINT AUTO_INCREMENT PRIMARY KEY,
     exchangePairID BIGINT NOT NULL,
+    baseCurrencyID BIGINT NOT NULL,
+    quoteCurrencyID BIGINT NOT NULL,
     buyRate NUMERIC(18,6) NOT NULL,
     sellRate NUMERIC(18,6) NOT NULL,
     sourceName VARCHAR(50),
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_currentExchangeRate_exchangePairID (exchangePairID),
-    CONSTRAINT fk_currentExchangeRate_exchangePairID
-        FOREIGN KEY (exchangePairID) REFERENCES exchangePair(exchangePairID)
+    KEY idx_currentExchangeRate_baseCurrencyID (baseCurrencyID),
+    KEY idx_currentExchangeRate_quoteCurrencyID (quoteCurrencyID),
+    CONSTRAINT fk_currentExchangeRate_baseCurrencyID
+        FOREIGN KEY (baseCurrencyID) REFERENCES currency(currencyID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_currentExchangeRate_quoteCurrencyID
+        FOREIGN KEY (quoteCurrencyID) REFERENCES currency(currencyID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -74,12 +60,7 @@ CREATE TABLE historicalExchangeRate (
     sellRate NUMERIC(18,6) NOT NULL,
     validFrom TIMESTAMP NOT NULL,
     validTo TIMESTAMP NULL,
-    recordedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_historicalExchangeRate_exchangePairID (exchangePairID),
-    CONSTRAINT fk_historicalExchangeRate_exchangePairID
-        FOREIGN KEY (exchangePairID) REFERENCES exchangePair(exchangePairID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
+    recordedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE userRole (
@@ -91,22 +72,71 @@ CREATE TABLE userRole (
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE TABLE userInfo (
-    userID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    userCode VARCHAR(30) NOT NULL,
+CREATE TABLE people (
+    personID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    personCode VARCHAR(50) NOT NULL,
+    countryID BIGINT NOT NULL,
+    email VARCHAR(150) NOT NULL,
     firstName VARCHAR(100) NOT NULL,
     lastName VARCHAR(100) NOT NULL,
-    email VARCHAR(150) NOT NULL,
     passwordHash VARCHAR(255) NOT NULL,
-    roleCode VARCHAR(30) NOT NULL,
+    isEmailVerified BOOLEAN NOT NULL DEFAULT FALSE,
     isActive BOOLEAN NOT NULL DEFAULT TRUE,
     lastLoginAt TIMESTAMP NULL,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_userInfo_userCode (userCode),
-    UNIQUE KEY uq_userInfo_email (email),
-    KEY idx_userInfo_roleCode (roleCode),
-    CONSTRAINT fk_userInfo_roleCode
+    UNIQUE KEY uq_people_personCode (personCode),
+    UNIQUE KEY uq_people_email (email),
+    KEY idx_people_countryID (countryID),
+    CONSTRAINT fk_people_countryID
+        FOREIGN KEY (countryID) REFERENCES country(countryID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+) ENGINE=InnoDB;
+
+CREATE TABLE personType (
+    personTypeCode VARCHAR(30) PRIMARY KEY,
+    personTypeName VARCHAR(50) NOT NULL,
+    personTypeDescription VARCHAR(150),
+    isActive BOOLEAN NOT NULL DEFAULT TRUE,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE peoplePersonType (
+    peoplePersonTypeID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    personID BIGINT NOT NULL,
+    personTypeCode VARCHAR(30) NOT NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_peoplePersonType_person_type (personID, personTypeCode),
+    KEY idx_peoplePersonType_personID (personID),
+    KEY idx_peoplePersonType_personTypeCode (personTypeCode),
+    CONSTRAINT fk_peoplePersonType_personID
+        FOREIGN KEY (personID) REFERENCES people(personID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_peoplePersonType_personTypeCode
+        FOREIGN KEY (personTypeCode) REFERENCES personType(personTypeCode)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+) ENGINE=InnoDB;
+
+CREATE TABLE systemUser (
+    systemUserID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    personID BIGINT NOT NULL,
+    userCode VARCHAR(30) NOT NULL,
+    roleCode VARCHAR(30) NOT NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_systemUser_personID (personID),
+    UNIQUE KEY uq_systemUser_userCode (userCode),
+    KEY idx_systemUser_roleCode (roleCode),
+    CONSTRAINT fk_systemUser_personID
+        FOREIGN KEY (personID) REFERENCES people(personID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_systemUser_roleCode
         FOREIGN KEY (roleCode) REFERENCES userRole(roleCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
@@ -160,8 +190,8 @@ CREATE TABLE dynamicSiteInfo (
     siteStatusCode VARCHAR(30) NOT NULL,
     primaryDomainName VARCHAR(150) NOT NULL,
     marketingFocus VARCHAR(80),
-    brandVoice VARCHAR(80),
-    targetSegment VARCHAR(80),
+    brandVoice TEXT,
+    siteVisualsConfig JSON NULL,
     launchDate DATETIME,
     closeDate DATETIME,
     clientName VARCHAR(80),
@@ -209,41 +239,33 @@ CREATE TABLE dynamicSiteDomain (
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
 
-CREATE TABLE dynamicSiteAIGeneration (
-    dynamicSiteAIGenerationID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    dynamicSiteID BIGINT NOT NULL,
-    promptContent TEXT,
-    generatedConfiguration JSON,
-    generationStatusCode VARCHAR(30) NOT NULL,
-    generationDetails VARCHAR(250),
-    generatedAt TIMESTAMP NULL,
+CREATE TABLE metricType (
+    metricTypeCode VARCHAR(30) PRIMARY KEY,
+    metricName VARCHAR(50) NOT NULL,
+    metricDescription VARCHAR(150),
+    valueType VARCHAR(20) NOT NULL,
+    isActive BOOLEAN NOT NULL DEFAULT TRUE,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    KEY idx_dynamicSiteAIGeneration_dynamicSiteID (dynamicSiteID),
-    KEY idx_dynamicSiteAIGeneration_generationStatusCode (generationStatusCode),
-    CONSTRAINT fk_dynamicSiteAIGeneration_dynamicSiteID
-        FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_dynamicSiteAIGeneration_generationStatusCode
-        FOREIGN KEY (generationStatusCode) REFERENCES dynamicSiteGenerationStatus(statusCode)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE dynamicSiteMetric (
     dynamicSiteMetricID BIGINT AUTO_INCREMENT PRIMARY KEY,
     dynamicSiteID BIGINT NOT NULL,
+    metricTypeCode VARCHAR(30) NOT NULL,
     metricDate DATE NOT NULL,
-    visitCount INT NOT NULL DEFAULT 0,
-    sessionCount INT NOT NULL DEFAULT 0,
-    purchaseCount INT NOT NULL DEFAULT 0,
-    conversionRate DECIMAL(10,4) NOT NULL DEFAULT 0.0000,
+    metricValue DECIMAL(18,6) NOT NULL,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_dynamicSiteMetric_site_date (dynamicSiteID, metricDate),
+    KEY idx_dynamicSiteMetric_dynamicSiteID (dynamicSiteID),
+    KEY idx_dynamicSiteMetric_metricTypeCode (metricTypeCode),
+    KEY idx_dynamicSiteMetric_metricDate (metricDate),
     CONSTRAINT fk_dynamicSiteMetric_dynamicSiteID
         FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_dynamicSiteMetric_metricTypeCode
+        FOREIGN KEY (metricTypeCode) REFERENCES metricType(metricTypeCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -264,14 +286,14 @@ CREATE TABLE dynamicSiteStatusLog (
     currentSiteStatusCode VARCHAR(30) NOT NULL,
     changeDetails VARCHAR(250),
     changeSourceCode VARCHAR(30) NOT NULL,
-    changedByUserID BIGINT,
+    changedByPersonID BIGINT,
     changedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_dynamicSiteStatusLog_dynamicSiteID (dynamicSiteID),
     KEY idx_dynamicSiteStatusLog_previousSiteStatusCode (previousSiteStatusCode),
     KEY idx_dynamicSiteStatusLog_currentSiteStatusCode (currentSiteStatusCode),
     KEY idx_dynamicSiteStatusLog_changeSourceCode (changeSourceCode),
-    KEY idx_dynamicSiteStatusLog_changedByUserID (changedByUserID),
+    KEY idx_dynamicSiteStatusLog_changedByPersonID (changedByPersonID),
     CONSTRAINT fk_dynamicSiteStatusLog_dynamicSiteID
         FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
         ON DELETE NO ACTION
@@ -288,8 +310,8 @@ CREATE TABLE dynamicSiteStatusLog (
         FOREIGN KEY (changeSourceCode) REFERENCES changeSource(sourceCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
-    CONSTRAINT fk_dynamicSiteStatusLog_changedByUserID
-        FOREIGN KEY (changedByUserID) REFERENCES userInfo(userID)
+    CONSTRAINT fk_dynamicSiteStatusLog_changedByPersonID
+        FOREIGN KEY (changedByPersonID) REFERENCES people(personID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -299,12 +321,12 @@ CREATE TABLE dynamicSiteAuditLog (
     dynamicSiteID BIGINT NOT NULL,
     eventTypeCode VARCHAR(30) NOT NULL,
     eventDetails VARCHAR(250),
-    performedByUserID BIGINT,
+    performedByPersonID BIGINT,
     performedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_dynamicSiteAuditLog_dynamicSiteID (dynamicSiteID),
     KEY idx_dynamicSiteAuditLog_eventTypeCode (eventTypeCode),
-    KEY idx_dynamicSiteAuditLog_performedByUserID (performedByUserID),
+    KEY idx_dynamicSiteAuditLog_performedByPersonID (performedByPersonID),
     CONSTRAINT fk_dynamicSiteAuditLog_dynamicSiteID
         FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
         ON DELETE NO ACTION
@@ -313,30 +335,8 @@ CREATE TABLE dynamicSiteAuditLog (
         FOREIGN KEY (eventTypeCode) REFERENCES dynamicSiteEventType(eventTypeCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
-    CONSTRAINT fk_dynamicSiteAuditLog_performedByUserID
-        FOREIGN KEY (performedByUserID) REFERENCES userInfo(userID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
-) ENGINE=InnoDB;
-
-CREATE TABLE customer (
-    customerID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    customerCode VARCHAR(50) NOT NULL,
-    countryID BIGINT NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    firstName VARCHAR(100) NOT NULL,
-    lastName VARCHAR(100) NOT NULL,
-    passwordHash VARCHAR(255) NOT NULL,
-    isEmailVerified BOOLEAN NOT NULL DEFAULT FALSE,
-    isActive BOOLEAN NOT NULL DEFAULT TRUE,
-    lastLoginAt TIMESTAMP NULL,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_customer_customerCode (customerCode),
-    UNIQUE KEY uq_customer_email (email),
-    KEY idx_customer_countryID (countryID),
-    CONSTRAINT fk_customer_countryID
-        FOREIGN KEY (countryID) REFERENCES country(countryID)
+    CONSTRAINT fk_dynamicSiteAuditLog_performedByPersonID
+        FOREIGN KEY (performedByPersonID) REFERENCES people(personID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -353,7 +353,7 @@ CREATE TABLE orderStatus (
 CREATE TABLE customerOrder (
     customerOrderID BIGINT AUTO_INCREMENT PRIMARY KEY,
     orderCode VARCHAR(50) NOT NULL,
-    customerID BIGINT NOT NULL,
+    personID BIGINT NOT NULL,
     dynamicSiteID BIGINT NOT NULL,
     customerCountryID BIGINT NOT NULL,
     currencyID BIGINT NOT NULL,
@@ -368,13 +368,13 @@ CREATE TABLE customerOrder (
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_customerOrder_orderCode (orderCode),
-    KEY idx_customerOrder_customerID (customerID),
+    KEY idx_customerOrder_personID (personID),
     KEY idx_customerOrder_dynamicSiteID (dynamicSiteID),
     KEY idx_customerOrder_customerCountryID (customerCountryID),
     KEY idx_customerOrder_currencyID (currencyID),
     KEY idx_customerOrder_orderStatusCode (orderStatusCode),
-    CONSTRAINT fk_customerOrder_customerID
-        FOREIGN KEY (customerID) REFERENCES customer(customerID)
+    CONSTRAINT fk_customerOrder_personID
+        FOREIGN KEY (personID) REFERENCES people(personID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
     CONSTRAINT fk_customerOrder_dynamicSiteID
@@ -395,6 +395,76 @@ CREATE TABLE customerOrder (
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
 
+CREATE TABLE productCategory (
+    categoryCode VARCHAR(30) PRIMARY KEY,
+    categoryName VARCHAR(80) NOT NULL,
+    categoryDescription VARCHAR(200),
+    isActive BOOLEAN NOT NULL DEFAULT TRUE,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE product (
+    productID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    productCode VARCHAR(50) NOT NULL,
+    dynamicSiteID BIGINT NOT NULL,
+    productCategoryCode VARCHAR(30) NOT NULL,
+    productName VARCHAR(120) NOT NULL,
+    productDescription VARCHAR(500),
+    sku VARCHAR(50) NOT NULL,
+    baseCurrencyID BIGINT NOT NULL,
+    basePrice DECIMAL(18,6) NOT NULL DEFAULT 0,
+    updatedByPersonID BIGINT,
+    isActive BOOLEAN NOT NULL DEFAULT TRUE,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_product_productCode (productCode),
+    UNIQUE KEY uq_product_sku (sku),
+    KEY idx_product_dynamicSiteID (dynamicSiteID),
+    KEY idx_product_productCategoryCode (productCategoryCode),
+    KEY idx_product_baseCurrencyID (baseCurrencyID),
+    KEY idx_product_updatedByPersonID (updatedByPersonID),
+    CONSTRAINT fk_product_dynamicSiteID
+        FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_product_productCategoryCode
+        FOREIGN KEY (productCategoryCode) REFERENCES productCategory(categoryCode)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_product_baseCurrencyID
+        FOREIGN KEY (baseCurrencyID) REFERENCES currency(currencyID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_product_updatedByPersonID
+        FOREIGN KEY (updatedByPersonID) REFERENCES people(personID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+) ENGINE=InnoDB;
+
+CREATE TABLE customerOrderDetail (
+    customerOrderDetailID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customerOrderID BIGINT NOT NULL,
+    productID BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    unitPrice DECIMAL(18,6) NOT NULL,
+    taxAmount DECIMAL(18,6) NOT NULL DEFAULT 0,
+    discountAmount DECIMAL(18,6) NOT NULL DEFAULT 0,
+    lineTotal DECIMAL(18,6) NOT NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_customerOrderDetail_customerOrderID (customerOrderID),
+    KEY idx_customerOrderDetail_productID (productID),
+    CONSTRAINT fk_customerOrderDetail_customerOrderID
+        FOREIGN KEY (customerOrderID) REFERENCES customerOrder(customerOrderID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_customerOrderDetail_productID
+        FOREIGN KEY (productID) REFERENCES product(productID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+) ENGINE=InnoDB;
+
 CREATE TABLE customerOrderStatusLog (
     customerOrderStatusLogID BIGINT AUTO_INCREMENT PRIMARY KEY,
     customerOrderID BIGINT NOT NULL,
@@ -402,14 +472,14 @@ CREATE TABLE customerOrderStatusLog (
     currentOrderStatusCode VARCHAR(30) NOT NULL,
     changeDetails VARCHAR(250),
     changeSourceCode VARCHAR(30) NOT NULL,
-    changedByUserID BIGINT,
+    changedByPersonID BIGINT,
     changedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_customerOrderStatusLog_customerOrderID (customerOrderID),
     KEY idx_customerOrderStatusLog_previousOrderStatusCode (previousOrderStatusCode),
     KEY idx_customerOrderStatusLog_currentOrderStatusCode (currentOrderStatusCode),
     KEY idx_customerOrderStatusLog_changeSourceCode (changeSourceCode),
-    KEY idx_customerOrderStatusLog_changedByUserID (changedByUserID),
+    KEY idx_customerOrderStatusLog_changedByPersonID (changedByPersonID),
     CONSTRAINT fk_customerOrderStatusLog_customerOrderID
         FOREIGN KEY (customerOrderID) REFERENCES customerOrder(customerOrderID)
         ON DELETE NO ACTION
@@ -426,55 +496,8 @@ CREATE TABLE customerOrderStatusLog (
         FOREIGN KEY (changeSourceCode) REFERENCES changeSource(sourceCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
-    CONSTRAINT fk_customerOrderStatusLog_changedByUserID
-        FOREIGN KEY (changedByUserID) REFERENCES userInfo(userID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
-) ENGINE=InnoDB;
-
-CREATE TABLE productCategory (
-    categoryCode VARCHAR(30) PRIMARY KEY,
-    categoryName VARCHAR(80) NOT NULL,
-    categoryDescription VARCHAR(200),
-    isActive BOOLEAN NOT NULL DEFAULT TRUE,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
-CREATE TABLE product (
-    productID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    productCode VARCHAR(50) NOT NULL,
-    dynamicSiteID BIGINT NOT NULL,
-    categoryCode VARCHAR(30) NOT NULL,
-    productName VARCHAR(120) NOT NULL,
-    productDescription VARCHAR(500),
-    sku VARCHAR(50) NOT NULL,
-    baseCurrencyID BIGINT NOT NULL,
-    basePrice DECIMAL(18,6) NOT NULL DEFAULT 0,
-    updatedByUserID BIGINT,
-    isActive BOOLEAN NOT NULL DEFAULT TRUE,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_product_productCode (productCode),
-    UNIQUE KEY uq_product_sku (sku),
-    KEY idx_product_dynamicSiteID (dynamicSiteID),
-    KEY idx_product_categoryCode (categoryCode),
-    KEY idx_product_baseCurrencyID (baseCurrencyID),
-    KEY idx_product_updatedByUserID (updatedByUserID),
-    CONSTRAINT fk_product_dynamicSiteID
-        FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_product_categoryCode
-        FOREIGN KEY (categoryCode) REFERENCES productCategory(categoryCode)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_product_baseCurrencyID
-        FOREIGN KEY (baseCurrencyID) REFERENCES currency(currencyID)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_product_updatedByUserID
-        FOREIGN KEY (updatedByUserID) REFERENCES userInfo(userID)
+    CONSTRAINT fk_customerOrderStatusLog_changedByPersonID
+        FOREIGN KEY (changedByPersonID) REFERENCES people(personID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -482,6 +505,7 @@ CREATE TABLE product (
 CREATE TABLE productPrice (
     productPriceID BIGINT AUTO_INCREMENT PRIMARY KEY,
     productID BIGINT NOT NULL,
+    dynamicSiteID BIGINT NOT NULL,
     currencyID BIGINT NOT NULL,
     priceAmount DECIMAL(18,6) NOT NULL,
     validFrom TIMESTAMP NOT NULL,
@@ -490,9 +514,14 @@ CREATE TABLE productPrice (
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_productPrice_productID (productID),
+    KEY idx_productPrice_dynamicSiteID (dynamicSiteID),
     KEY idx_productPrice_currencyID (currencyID),
     CONSTRAINT fk_productPrice_productID
         FOREIGN KEY (productID) REFERENCES product(productID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_productPrice_dynamicSiteID
+        FOREIGN KEY (dynamicSiteID) REFERENCES dynamicSiteInfo(dynamicSiteID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
     CONSTRAINT fk_productPrice_currencyID
@@ -741,7 +770,10 @@ CREATE TABLE inventory (
 CREATE TABLE paymentMethod (
     methodCode VARCHAR(30) PRIMARY KEY,
     methodName VARCHAR(50) NOT NULL,
+    providerName VARCHAR(50),
+    providerDescription VARCHAR(150),
     methodDescription VARCHAR(150),
+    config JSON NULL,
     isActive BOOLEAN NOT NULL DEFAULT TRUE,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -756,34 +788,27 @@ CREATE TABLE paymentTransactionStatus (
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE TABLE paymentProvider (
-    providerCode VARCHAR(30) PRIMARY KEY,
-    providerName VARCHAR(50) NOT NULL,
-    providerDescription VARCHAR(150),
-    isActive BOOLEAN NOT NULL DEFAULT TRUE,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
 CREATE TABLE paymentTransaction (
     paymentTransactionID BIGINT AUTO_INCREMENT PRIMARY KEY,
     customerOrderID BIGINT NOT NULL,
     transactionCode VARCHAR(50) NOT NULL,
     methodCode VARCHAR(30) NOT NULL,
     paymentStatusCode VARCHAR(30) NOT NULL,
-    providerCode VARCHAR(30) NOT NULL,
-    transactionAmount DECIMAL(18,6) NOT NULL DEFAULT 0,
+    transactionAmount DECIMAL(18,6) NOT NULL,
     currencyID BIGINT NOT NULL,
+    exchangeRate DECIMAL(18,6) NOT NULL,
+    exchangeRateID BIGINT,
     providerReference VARCHAR(80),
     transactionDate TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    checksum VARCHAR(80) NOT NULL,
     createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_paymentTransaction_transactionCode (transactionCode),
     KEY idx_paymentTransaction_customerOrderID (customerOrderID),
     KEY idx_paymentTransaction_methodCode (methodCode),
     KEY idx_paymentTransaction_paymentStatusCode (paymentStatusCode),
-    KEY idx_paymentTransaction_providerCode (providerCode),
     KEY idx_paymentTransaction_currencyID (currencyID),
+    KEY idx_paymentTransaction_exchangeRateID (exchangeRateID),
     CONSTRAINT fk_paymentTransaction_customerOrderID
         FOREIGN KEY (customerOrderID) REFERENCES customerOrder(customerOrderID)
         ON DELETE NO ACTION
@@ -796,12 +821,12 @@ CREATE TABLE paymentTransaction (
         FOREIGN KEY (paymentStatusCode) REFERENCES paymentTransactionStatus(statusCode)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
-    CONSTRAINT fk_paymentTransaction_providerCode
-        FOREIGN KEY (providerCode) REFERENCES paymentProvider(providerCode)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
     CONSTRAINT fk_paymentTransaction_currencyID
         FOREIGN KEY (currencyID) REFERENCES currency(currencyID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT fk_paymentTransaction_exchangeRateID
+        FOREIGN KEY (exchangeRateID) REFERENCES currentExchangeRate(currentExchangeRateID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;
@@ -851,36 +876,6 @@ CREATE TABLE shipment (
         ON UPDATE NO ACTION,
     CONSTRAINT fk_shipment_viewTypeCode
         FOREIGN KEY (viewTypeCode) REFERENCES shipmentViewType(viewTypeCode)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION
-) ENGINE=InnoDB;
-
-CREATE TABLE generalLog (
-    generalLogID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    tableName VARCHAR(60) NOT NULL,
-    recordID BIGINT NULL,
-    recordCode VARCHAR(80) NULL,
-    actionType VARCHAR(30) NOT NULL,
-    fieldName VARCHAR(60) NULL,
-    oldValue TEXT NULL,
-    newValue TEXT NULL,
-    changeDetails VARCHAR(500) NULL,
-    changeSourceCode VARCHAR(30) NOT NULL,
-    performedByUserID BIGINT NULL,
-    performedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_generalLog_tableName (tableName),
-    KEY idx_generalLog_recordID (recordID),
-    KEY idx_generalLog_recordCode (recordCode),
-    KEY idx_generalLog_actionType (actionType),
-    KEY idx_generalLog_changeSourceCode (changeSourceCode),
-    KEY idx_generalLog_performedByUserID (performedByUserID),
-    CONSTRAINT fk_generalLog_changeSourceCode
-        FOREIGN KEY (changeSourceCode) REFERENCES changeSource(sourceCode)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT fk_generalLog_performedByUserID
-        FOREIGN KEY (performedByUserID) REFERENCES userInfo(userID)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION
 ) ENGINE=InnoDB;

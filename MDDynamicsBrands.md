@@ -1,25 +1,7 @@
-## Crea el script para la creacion de la base de datos en MySQL con la siguien informacion, recuerda siempre agregar ON DELETE NO ACTION
-
+Crea el script para la creacion de la base de datos en MySQL con la siguien informacion, recuerda siempre agregar ON DELETE NO ACTION
 El contexto es: Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de generar sitios de e-commerce dinámicos.  
 A partir de parámetros (logo, enfoque, país), la IA despliega tiendas virtuales con marcas blancas.  
 Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic, cada uno con un enfoque de marketing y mensajes distintos para el mismo producto base.
-
-# tables
-
-## generalLog
-- generalLogID PK
-- tableName varchar 60
-- recordID bigint
-- recordCode varchar 80
-- actionType varchar 30
-- fieldName varchar 60
-- oldValue text
-- newValue text
-- changeDetails varchar 500
-- changeSourceCode varchar 30
-- performedByUserID bigint
-- performedAt timestamp
-- createdAt timestamp
 
 ## currency
 - currencyID PK
@@ -40,17 +22,11 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - createdAt timestamp
 - updatedAt timestamp
 
-## exchangePair
-- exchangePairID PK
-- baseCurrencyID bigint
-- quoteCurrencyID bigint
-- isActive boolean
-- createdAt timestamp
-- updatedAt timestamp
-
 ## currentExchangeRate
 - currentExchangeRateID PK
 - exchangePairID bigint
+- baseCurrencyID bigint
+- quoteCurrencyID bigint
 - buyRate numeric 18,6
 - sellRate numeric 18,6
 - sourceName varchar 50
@@ -66,23 +42,47 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - recordedAt timestamp
 
 ## userRole
-- roleCode PK varchar 30
+- roleCode PK
 - roleName varchar 50
 - roleDescription varchar 150
 - isActive boolean
 - createdAt timestamp
 - updatedAt timestamp
 
-## userInfo
-- userID PK
-- userCode varchar 30
+## people
+- personID PK
+- personCode varchar 50
+- countryID bigint
+- email varchar 150
 - firstName varchar 100
 - lastName varchar 100
-- email varchar 150
 - passwordHash varchar 255
-- roleCode varchar 30
+- isEmailVerified boolean
 - isActive boolean
 - lastLoginAt timestamp
+- createdAt timestamp
+- updatedAt timestamp
+
+## personType
+- personTypeCode PK varchar 30
+- personTypeName varchar 50
+- personTypeDescription varchar 150
+- isActive boolean
+- createdAt timestamp
+- updatedAt timestamp
+
+## peoplePersonType
+- peoplePersonTypeID PK
+- personID bigint
+- personTypeCode varchar 30
+- createdAt timestamp
+- updatedAt timestamp
+
+## systemUser
+- systemUserID PK
+- personID bigint
+- userCode varchar 30
+- roleCode varchar 30
 - createdAt timestamp
 - updatedAt timestamp
 
@@ -130,8 +130,8 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - siteStatusCode varchar 30
 - primaryDomainName varchar 150
 - marketingFocus varchar 80
-- brandVoice varchar 80
-- targetSegment varchar 80
+- brandVoice TEXT
+- siteVisualsConfig JSON NULL
 - launchDate datetime
 - closeDate datetime
 - clientName varchar 80
@@ -149,25 +149,21 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - createdAt timestamp
 - updatedAt timestamp
 
-## dynamicSiteAIGeneration
-- dynamicSiteAIGenerationID PK
-- dynamicSiteID bigint
-- promptContent text
-- generatedConfiguration json
-- generationStatusCode varchar 30
-- generationDetails varchar 250
-- generatedAt timestamp
+## metricType
+- metricTypeCode PK varchar 30
+- metricName varchar 50
+- metricDescription varchar 150
+- valueType varchar 20
+- isActive boolean
 - createdAt timestamp
 - updatedAt timestamp
 
 ## dynamicSiteMetric
 - dynamicSiteMetricID PK
 - dynamicSiteID bigint
+- metricTypeCode varchar 30
 - metricDate date
-- visitCount int
-- sessionCount int
-- purchaseCount int
-- conversionRate decimal 10,4
+- metricValue decimal 18,6
 - createdAt timestamp
 - updatedAt timestamp
 
@@ -186,7 +182,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - currentSiteStatusCode varchar 30
 - changeDetails varchar 250
 - changeSourceCode varchar 30
-- changedByUserID bigint
+- changedByPersonID bigint
 - changedAt timestamp
 - createdAt timestamp
 
@@ -195,23 +191,9 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - dynamicSiteID bigint
 - eventTypeCode varchar 30
 - eventDetails varchar 250
-- performedByUserID bigint
+- performedByPersonID bigint
 - performedAt timestamp
 - createdAt timestamp
-
-## customer
-- customerID PK
-- customerCode varchar 50
-- countryID bigint
-- email varchar 150
-- firstName varchar 100
-- lastName varchar 100
-- passwordHash varchar 255
-- isEmailVerified boolean
-- isActive boolean
-- lastLoginAt timestamp
-- createdAt timestamp
-- updatedAt timestamp
 
 ## orderStatus
 - statusCode PK varchar 30
@@ -224,7 +206,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 ## customerOrder
 - customerOrderID PK
 - orderCode varchar 50
-- customerID bigint
+- personID bigint
 - dynamicSiteID bigint
 - customerCountryID bigint
 - currencyID bigint
@@ -239,6 +221,18 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - createdAt timestamp
 - updatedAt timestamp
 
+## customerOrderDetail
+- customerOrderDetailID PK
+- customerOrderID bigint
+- productID bigint
+- quantity int
+- unitPrice decimal 18,6
+- taxAmount decimal 18,6
+- discountAmount decimal 18,6
+- lineTotal decimal 18,6
+- createdAt timestamp
+- updatedAt timestamp
+
 ## customerOrderStatusLog
 - customerOrderStatusLogID PK
 - customerOrderID bigint
@@ -246,7 +240,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - currentOrderStatusCode varchar 30
 - changeDetails varchar 250
 - changeSourceCode varchar 30
-- changedByUserID bigint
+- changedByPersonID bigint
 - changedAt timestamp
 - createdAt timestamp
 
@@ -262,13 +256,13 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - productID PK
 - productCode varchar 50
 - dynamicSiteID bigint
-- categoryCode varchar 30
+- productCategoryCode varchar 30
 - productName varchar 120
 - productDescription varchar 500
 - sku varchar 50
 - baseCurrencyID bigint
 - basePrice decimal 18,6
-- updatedByUserID bigint
+- updatedByPersonID bigint
 - isActive boolean
 - createdAt timestamp
 - updatedAt timestamp
@@ -276,6 +270,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 ## productPrice
 - productPriceID PK
 - productID bigint
+- dynamicSiteID bigint
 - currencyID bigint
 - priceAmount decimal 18,6
 - validFrom timestamp
@@ -319,7 +314,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - packagingName varchar 80
 - packagingDescription varchar 250
 - unitContent varchar 50
-- unitMeasure varchar 30
+- unitMeasure varchar 30  -- normaliza esto
 - packageMaterial varchar 50
 - isFragile boolean
 - isPrimary boolean
@@ -418,25 +413,20 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - updatedAt timestamp
 
 ## paymentMethod
-- methodCode PK varchar 30
+- methodCode PK
 - methodName varchar 50
+- providerName varchar 50
+- providerDescription varchar 150
 - methodDescription varchar 150
+- config JSON NULL
 - isActive boolean
 - createdAt timestamp
 - updatedAt timestamp
 
 ## paymentTransactionStatus
-- statusCode PK varchar 30
+- statusCode PK
 - statusName varchar 50
 - statusDescription varchar 150
-- isActive boolean
-- createdAt timestamp
-- updatedAt timestamp
-
-## paymentProvider
-- providerCode PK varchar 30
-- providerName varchar 50
-- providerDescription varchar 150
 - isActive boolean
 - createdAt timestamp
 - updatedAt timestamp
@@ -447,11 +437,13 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - transactionCode varchar 50
 - methodCode varchar 30
 - paymentStatusCode varchar 30
-- providerCode varchar 30
 - transactionAmount decimal 18,6
 - currencyID bigint
+- exchangeRate decimal 18,6
+- exchangeRateID bigint
 - providerReference varchar 80
 - transactionDate timestamp
+- checksum varchar 80
 - createdAt timestamp
 - updatedAt timestamp
 
