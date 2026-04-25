@@ -700,6 +700,7 @@ CREATE TABLE countryProductPermission (
     countryProductPermissionID BIGINT AUTO_INCREMENT PRIMARY KEY,
     productID BIGINT NOT NULL,
     countryID BIGINT NOT NULL,
+    permissionCost BIGINT NOT NULL,
     permissionCode VARCHAR(50) NOT NULL,
     permissionName VARCHAR(100) NOT NULL,
     permissionStatusCode VARCHAR(30) NOT NULL,
