@@ -19,3 +19,9 @@ igual en historial de cambios que fechaFin sea automaticamente 9999 el año cuan
 cada vez que se haga una orden, debe de crearse un registro en transacciones automaticamente, ademas de que se debe actulizar el inventario, de igual manera automaticamente, y tambien el estado de cuenta
 
 Por ultimo, cada que en estadosCuenta, estado cambie a completado, se debe actualizar el balanceNeto
+
+En OrdenDetalles Verificar mendiante un trigger, a la hora de crear un orden detalle, que se escoja automaticamente el loteID mas actiguo del producto que aun tenga disponible, a demas de que si en ese lote hay menos productos disponibles del que se requiere, se cree automaticamente una ordendetalle nueva, con los mismos datos pero ajustando la cantidad segun corresponda, ademas de restar automaticamente en el lote o sumar segun el tipo del ordenID.TipoOrden
+
+Cuando se creen Orden Detalles, OrdenDetallesImpuestos, OrdenDetalleDescuentos, actualicen los datos correspondientes de cada uno, por ejemplo, cuando se cree un ordendetalleDescuentos, se actualice descuentoFinal en ordenDetalle y precioLoteFinal, a su ves que se actualice precioFinal en ordenes, y todos los que se relacionen de la misma manera, valida con migo cuales consideras que caen en esta categoria antes de proceder.
+
+cada que se crea una orden, se crea automaticamente un estado de cuenta, cada que se actualiza un estado de cuenta en el apartado de estado, se actualiza el balance neto solamente si se cambia a comletado

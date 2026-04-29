@@ -335,7 +335,7 @@ CREATE TABLE HistorialCambiosMonedas (
     tipoCambioID INT NOT NULL,
     usuarioModificacion INT,
     fechaInicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fechaFin TIMESTAMP,
+    fechaFin TIMESTAMP DEFAULT '9999-12-31 23:59:59'::timestamp,
     tipoCambio DECIMAL(18,6) NOT NULL,
     checksum VARCHAR(100),
     horaCambio TIMESTAMP,
