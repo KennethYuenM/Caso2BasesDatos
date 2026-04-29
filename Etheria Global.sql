@@ -2,12 +2,12 @@
 /* DATABASE                                                     */
 /*==============================================================*/
 
-DO $$
+/*DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'etheria_global') THEN
         CREATE DATABASE etheria_global;
     END IF;
-END $$;
+END $$;*/
 
 -- Ejecutar luego:
 -- \c etheria_global;
@@ -59,7 +59,7 @@ CREATE TABLE Usuarios (
 CREATE TABLE Roles (
     roleID SERIAL PRIMARY KEY,
     rolNombre VARCHAR(40) NOT NULL,
-    descripcion VARCHAR(500),
+    descripcion VARCHAR(500) NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
@@ -93,13 +93,13 @@ CREATE TABLE PermisosXRole (
 
 CREATE TABLE TablasSistema (
     tablaID SERIAL PRIMARY KEY,
-    nombreTabla VARCHAR(50),
+    nombreTabla VARCHAR(50) UNIQUE NOT NULL,
     creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE Acciones (
     accionID SERIAL PRIMARY KEY,
-    nombreAccion VARCHAR(10) CHECK (nombreAccion IN ('CREATE','READ','UPDATE','DELETE'))
+    nombreAccion VARCHAR(10) NOT NULL CHECK (nombreAccion IN ('CREATE','READ','UPDATE','DELETE'))
 );
 
 CREATE TABLE Logs (
@@ -107,7 +107,7 @@ CREATE TABLE Logs (
     usuarioModificacion INT,
     tablaID INT NOT NULL,
     accionID INT NOT NULL,
-    objetoAfectadoID INT,
+    objetoAfectadoID INT NOT NULL,
     datosViejos JSONB,
     datosNuevos JSONB,
     hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -125,14 +125,14 @@ CREATE TABLE Logs (
 
 CREATE TABLE Paises (
     paisID SERIAL PRIMARY KEY,
-    nombrePais VARCHAR(30),
-    codigoISO VARCHAR(3),
+    nombrePais VARCHAR(30) NOT NULL,
+    codigoISO VARCHAR(3) UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE NivelesGeograficos (
     nivelID SERIAL PRIMARY KEY,
-    nombreNGeografico VARCHAR(50),
+    nombreNGeografico VARCHAR(50) NOT NULL,
     orden INT NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
@@ -142,7 +142,7 @@ CREATE TABLE DivisionesGeograficas (
     paisID INT NOT NULL,
     nivelID INT NOT NULL,
     padreID INT,
-    nombre VARCHAR(100),
+    nombre VARCHAR(100) NOT NULL,
     FOREIGN KEY (paisID) REFERENCES Paises(paisID),
     FOREIGN KEY (nivelID) REFERENCES NivelesGeograficos(nivelID),
     FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID)
@@ -156,7 +156,7 @@ CREATE TABLE Direcciones (
     numero VARCHAR(20),
     geoposicion geography(Point,4326),
     referencia VARCHAR(500),
-    codigoPostal VARCHAR(20),
+    codigoPostal VARCHAR(20) NOT NULL,
     direccionCompleta TEXT,
     fechaCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
@@ -171,15 +171,15 @@ CREATE TABLE Direcciones (
 
 CREATE TABLE TiposContactos (
     tipoContactoID SERIAL PRIMARY KEY,
-    nombreTipoContacto VARCHAR(20)
+    nombreTipoContacto VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE Contactos (
     contactoID SERIAL PRIMARY KEY,
     tipoContactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    nombreContacto VARCHAR(50),
-    apellido VARCHAR(50),
+    nombreContacto VARCHAR(50) NOT NULL,
+    apellido VARCHAR(50) NOT NULL,
     segundoApellido VARCHAR(50),
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (tipoContactoID) REFERENCES TiposContactos(tipoContactoID),
@@ -188,7 +188,7 @@ CREATE TABLE Contactos (
 
 CREATE TABLE TiposTelefonos (
     tipoTelefonoID SERIAL PRIMARY KEY,
-    nombreTipoTelefono VARCHAR(20)
+    nombreTipoTelefono VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE TelefonosContactos (
@@ -196,7 +196,7 @@ CREATE TABLE TelefonosContactos (
     contactoID INT NOT NULL,
     tipoTelefonosID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    numeroContacto VARCHAR(20),
+    numeroContacto VARCHAR(20) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID),
     FOREIGN KEY (tipoTelefonosID) REFERENCES TiposTelefonos(tipoTelefonoID),
@@ -207,7 +207,7 @@ CREATE TABLE CorreosContactos (
     correoCantactoID SERIAL PRIMARY KEY,
     contactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    correo VARCHAR(50),
+    correo VARCHAR(50) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID),
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
@@ -215,7 +215,7 @@ CREATE TABLE CorreosContactos (
 
 CREATE TABLE TiposCentroLogistico (
     tipoID SERIAL PRIMARY KEY,
-    nombreTipoCLogistico VARCHAR(20)
+    nombreTipoCLogistico VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE CentrosLogisticos (
@@ -224,8 +224,8 @@ CREATE TABLE CentrosLogisticos (
     direccionID INT NOT NULL,
     contactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    nombreCentroLogistico VARCHAR(50),
-    telefono VARCHAR(20),
+    nombreCentroLogistico VARCHAR(50) NOT NULL,
+    telefono VARCHAR(20) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (tipoID) REFERENCES TiposCentroLogistico(tipoID),
     FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID),
@@ -240,8 +240,8 @@ CREATE TABLE CentrosLogisticos (
 
 CREATE TABLE Proveedores (
     proveedorID SERIAL PRIMARY KEY,
-    direccionID INT,
-    nombreProveedor VARCHAR(50),
+    direccionID INT NOT NULL,
+    nombreProveedor VARCHAR(50) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID)
 );
@@ -262,18 +262,18 @@ CREATE TABLE ContactosProveedor (
 
 CREATE TABLE Categorias (
     categoriaID SERIAL PRIMARY KEY,
-    nombreCategoriaP VARCHAR(20),
+    nombreCategoriaP VARCHAR(20) UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE Productos (
     productoID SERIAL PRIMARY KEY,
-    categoriaID INT,
+    categoriaID INT NOT NULL,
     usuarioModificacion INT,
-    proveedorID INT,
-    nombreProducto VARCHAR(40),
-    descripcion VARCHAR(200),
-    descripcionManejo VARCHAR(200),
+    proveedorID INT NOT NULL,
+    nombreProducto VARCHAR(40) NOT NULL,
+    descripcion VARCHAR(200) NOT NULL,
+    descripcionManejo VARCHAR(200) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID),
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
@@ -282,14 +282,14 @@ CREATE TABLE Productos (
 
 CREATE TABLE Caracteristicas (
     caracteristicaID SERIAL PRIMARY KEY,
-    nombreCaracteristicaP VARCHAR(50)
+    nombreCaracteristicaP VARCHAR(50) NOT NULL
 );
 
 CREATE TABLE ValorCaracteristicas (
     productoID INT NOT NULL,
     caracteristicaID INT NOT NULL,
-    valor VARCHAR(50),
-    deleted BOOLEAN DEFAULT FALSE,
+    valor VARCHAR(50) NOT NULL,
+    activo BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (productoID, caracteristicaID),
     FOREIGN KEY (productoID) REFERENCES Productos(productoID),
     FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID)
@@ -302,10 +302,10 @@ CREATE TABLE ValorCaracteristicas (
 
 CREATE TABLE Monedas (
     monedaID SERIAL PRIMARY KEY,
-    usuarioModificacion INT,
-    paisID INT,
-    simboloMoneda VARCHAR(10),
-    nombreMoneda VARCHAR(50),
+    usuarioModificacion INT NOT NULL,
+    paisID INT NOT NULL,
+    simboloMoneda VARCHAR(10) NOT NULL,
+    nombreMoneda VARCHAR(50) NOT NULL,
     tiempoCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
@@ -317,7 +317,7 @@ CREATE TABLE TiposCambio (
     usuarioModificacion INT,
     moneda1ID INT NOT NULL,
     moneda2ID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL CHECK (tipoCambio > 0),
     tiempoCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultimaActualizacion TIMESTAMP,
     checksum VARCHAR(100),
@@ -330,13 +330,13 @@ CREATE TABLE TiposCambio (
 
 CREATE TABLE HistorialCambiosMonedas (
     histotalCambioID SERIAL PRIMARY KEY,
-    moneda1ID INT,
-    moneda2ID INT,
-    tipoCambioID INT,
+    moneda1ID INT NOT NULL,
+    moneda2ID INT NOT NULL,
+    tipoCambioID INT NOT NULL,
     usuarioModificacion INT,
-    fechaInicio TIMESTAMP,
+    fechaInicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fechaFin TIMESTAMP,
-    tipoCambio DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL,
     checksum VARCHAR(100),
     horaCambio TIMESTAMP,
     FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID),
@@ -352,7 +352,7 @@ CREATE TABLE HistorialCambiosMonedas (
 
 CREATE TABLE TiposPermisos (
     tipoPermisoID SERIAL PRIMARY KEY,
-    nombreTipoPermiso VARCHAR(20)
+    nombreTipoPermiso VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE PermisosImportacion (
@@ -362,11 +362,11 @@ CREATE TABLE PermisosImportacion (
     usuarioModificacion INT NOT NULL,
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
-    nombrePermiso VARCHAR(20),
-    descripcion VARCHAR(200),
-    urlDocumentacion TEXT,
-    costo DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    nombrePermiso VARCHAR(20) NOT NULL,
+    descripcion VARCHAR(200) NOT NULL,
+    urlDocumentacion TEXT NOT NULL,
+    costo DECIMAL(18,6) NOT NULL CHECK (costo >= 0),
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (paisID) REFERENCES Paises(paisID),
     FOREIGN KEY (tipoPermisoID) REFERENCES TiposPermisos(tipoPermisoID),
@@ -382,17 +382,17 @@ CREATE TABLE PermisosImportacion (
 
 CREATE TABLE Lotes (
     loteID SERIAL PRIMARY KEY,
-    productoID INT,
-    cantidadProductoLoteInicial INT,
-    cantidadProductoLoteDisponible INT,
-    fechaFabricacion TIMESTAMP,
+    productoID INT NOT NULL,
+    cantidadProductoLoteInicial INT NOT NULL CHECK (cantidadProductoLoteInicial > 0),
+    cantidadProductoLoteDisponible INT NOT NULL CHECK (cantidadProductoLoteDisponible <= cantidadProductoLoteInicial),
+    fechaFabricacion TIMESTAMP NOT NULL,
     fechaVencimiento TIMESTAMP,
     FOREIGN KEY (productoID) REFERENCES Productos(productoID)
 );
 
 CREATE TABLE TipoMovimientosInventario (
     tipoMovimientoInvetarioID SERIAL PRIMARY KEY,
-    nombreTipoMovimientoInventario VARCHAR(20)
+    nombreTipoMovimientoInventario VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE MovimientosInventario (
@@ -400,7 +400,7 @@ CREATE TABLE MovimientosInventario (
     loteID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
     tipoMovimientoInvetarioID INT NOT NULL,
-    cantidad INT NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
@@ -409,9 +409,9 @@ CREATE TABLE MovimientosInventario (
 
 CREATE TABLE Inventarios (
     inventarioID SERIAL PRIMARY KEY,
-    loteID INT,
+    loteID INT NOT NULL,
     usuarioModificacion INT,
-    cantidadDisponible INT,
+    cantidadDisponible INT NOT NULL CHECK (cantidadDisponible >= 0),
     ultimaActualizacion TIMESTAMP,
     FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
@@ -425,9 +425,9 @@ CREATE TABLE Inventarios (
 CREATE TABLE HistorialPreciosProducto (
     historialPrecioID SERIAL PRIMARY KEY,
     productoID INT NOT NULL,
-    precio DECIMAL(18,6),
+    precio DECIMAL(18,6) NOT NULL,
     monedaID INT NOT NULL,
-    fechaInicio TIMESTAMP,
+    fechaInicio TIMESTAMP NOT NULL,
     fechaFin TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (productoID) REFERENCES Productos(productoID),
@@ -441,25 +441,25 @@ CREATE TABLE HistorialPreciosProducto (
 
 CREATE TABLE EstadosOrdenes (
     estadoID SERIAL PRIMARY KEY,
-    nombreEstadoOrden VARCHAR(10)
+    nombreEstadoOrden VARCHAR(10) UNIQUE NOT NULL
 );
 
 CREATE TABLE TiposOrden (
     tipoOrdenID SERIAL PRIMARY KEY,
-    nombre VARCHAR(20)
+    nombre VARCHAR(20) UNIQUE NOT NULL
 );
 
 CREATE TABLE Ordenes (
     ordenID SERIAL PRIMARY KEY,
-    estadoID INT,
-    tipoOrdenID INT,
-    usuarioModificacion INT,
-    direccionEnvioID INT,
-    direccionEntregaID INT,
-    monedaID INT,
-    tipoCambioID INT,
-    tipoCambio DECIMAL(18,6),
-    numeroOrden VARCHAR(30),
+    estadoID INT NOT NULL,
+    tipoOrdenID INT NOT NULL,
+    usuarioModificacion INT NOT NULL,
+    direccionEnvioID INT NOT NULL,
+    direccionEntregaID INT NOT NULL,
+    monedaID INT NOT NULL,
+    tipoCambioID INT NOT NULL,
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    numeroOrden VARCHAR(30) NOT NULL,
     precioFinal DECIMAL(18,6),
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID),
@@ -475,13 +475,13 @@ CREATE TABLE OrdenDetalles (
     ordenDetalleID SERIAL PRIMARY KEY,
     ordenID INT NOT NULL,
     productoID INT NOT NULL,
-    loteID INT,
+    loteID INT NOT NULL,
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
-    cantidad INT NOT NULL,
-    descuento DECIMAL(18,6),
-    costoEnvio DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    descuentoFinal DECIMAL(18,6) DEFAULT 0,
+    costoEnvio DECIMAL(18,6) NOT NULL,
     precioLoteFinal DECIMAL(18,6),
     checksum TEXT,
     FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
@@ -508,13 +508,13 @@ CREATE TABLE OrdenDetallePermisos (
 );
 
 CREATE TABLE OrdenDetalleDescuentos (
-    ordenDetalleID INT,
-    monedaID INT,
-    tipoCambioID INT,
-    tipoCambio DECIMAL(18,6),
-    descripcion VARCHAR(100),
-    monto DECIMAL(18,6),
-    PRIMARY KEY (ordenDetalleID, descripcion),
+    ordenDetalleDescuentoID SERIAL PRIMARY KEY,
+    ordenDetalleID INT NOT NULL,
+    monedaID INT NOT NULL,
+    tipoCambioID INT NOT NULL,
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    descripcion VARCHAR(100) NOT NULL,
+    monto DECIMAL(18,6) NOT NULL,
     FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID),
     FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
@@ -551,11 +551,16 @@ CREATE TABLE ImpuestosPais (
     usuarioModificacion INT NOT NULL,
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
-    nombre VARCHAR(50),
-    valor DECIMAL(5,2),
-    tipo tipo_impuesto,
-    fechaInicio TIMESTAMP,
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    nombre VARCHAR(50) NOT NULL,
+    valor DECIMAL(5,2) NOT NULL,
+    CHECK (
+        (tipo = 'porcentaje' AND valor > 0 AND valor <= 100)
+        OR
+        (tipo = 'monto_fijo' AND valor > 0)
+    ),
+    tipo tipo_impuesto NOT NULL,
+    fechaInicio TIMESTAMP NOT NULL,
     fechaFin TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (paisID) REFERENCES Paises(paisID),
@@ -571,12 +576,12 @@ CREATE TABLE ImpuestosPais (
 
 CREATE TABLE EstadoTransacciones (
     estadoTransaccionID SERIAL PRIMARY KEY,
-    nombreEstadoTransac VARCHAR(20)
+    nombreEstadoTransac VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE TipoTransacciones (
     tipoID SERIAL PRIMARY KEY,
-    nombreTipoTransac VARCHAR(20)
+    nombreTipoTransac VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE Transacciones (
@@ -585,10 +590,10 @@ CREATE TABLE Transacciones (
     usuarioModificacion INT NOT NULL,
     tipoID INT NOT NULL,
     estadoTransaccionID INT NOT NULL,
-    ordenID INT,
+    ordenID INT NOT NULL,
     tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
-    monto DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    monto DECIMAL(18,6) NOT NULL CHECK (monto > 0),
     descripcion TEXT,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     checksum TEXT,
@@ -609,8 +614,8 @@ CREATE TABLE EstadosCuenta (
     estadoCuentaID SERIAL PRIMARY KEY,
     ordenID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    tipoMovimiento tipo_movimiento_cuenta,
-    estado estado_cuenta_enum,
+    tipoMovimiento tipo_movimiento_cuenta NOT NULL,
+    estado estado_cuenta_enum NOT NULL,
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6),
@@ -625,6 +630,6 @@ CREATE TABLE EstadosCuenta (
 
 CREATE TABLE BalanceNeto (
     balanceID SERIAL PRIMARY KEY,
-    saldo DECIMAL(18,6),
+    saldo DECIMAL(18,6) NOT NULL,
     ultimaActualizacion TIMESTAMP
 );

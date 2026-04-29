@@ -130,7 +130,7 @@ Todo llega a un centro logístico en la costa Caribe de Nicaragua.
 - tipoCambioID (PK)
 - usuarioModificacion (FK)
 - moneda1ID (FK)
-- moneda2ID (FK) (validar con check que moneda 1 y 2 no sean iguales y un try cath)
+- moneda2ID (FK)
 - tipoCambio decimal(18,6)
 - tiempoCreacion timestamp
 - ultimaActualizacion timestamp
@@ -317,7 +317,7 @@ ademas de actualizar la anterior fechaFin)
 - tipoCambioID (FK)
 - tipoCambio decimal(18,6) 
 - cantidad int
-- descuento decimal(18,6)
+- descuentoFinal decimal(18,6)
 - costoEnvio decimal(18,6)
 - precioLoteFinal decimal(18,6) (calcular, segun todos los impuestos, costos de permisos y descuentos meidante un trigger)
 - checksum text
@@ -331,6 +331,7 @@ ademas de actualizar la anterior fechaFin)
 - permisoID (FK)
 
 ## OrdenDetalleDescuentos
+- ordenDetalleDescuentoID (PK)
 - ordenDetalleID (FK)
 - monedaID (FK)
 - tipoCambioID (FK)
