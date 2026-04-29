@@ -1,371 +1,545 @@
 USE dynamicBrandsDB;
 
-SELECT 'currency' AS tableName, COUNT(*) AS totalRows FROM currency
-UNION ALL
-SELECT 'country', COUNT(*) FROM country
-UNION ALL
-SELECT 'exchangePair', COUNT(*) FROM exchangePair
-UNION ALL
-SELECT 'currentExchangeRate', COUNT(*) FROM currentExchangeRate
-UNION ALL
-SELECT 'historicalExchangeRate', COUNT(*) FROM historicalExchangeRate
-UNION ALL
-SELECT 'userRole', COUNT(*) FROM userRole
-UNION ALL
-SELECT 'userInfo', COUNT(*) FROM userInfo
-UNION ALL
-SELECT 'brandTemplate', COUNT(*) FROM brandTemplate
-UNION ALL
-SELECT 'dynamicSiteStatus', COUNT(*) FROM dynamicSiteStatus
-UNION ALL
-SELECT 'dynamicSiteGenerationStatus', COUNT(*) FROM dynamicSiteGenerationStatus
-UNION ALL
-SELECT 'dynamicSiteEventType', COUNT(*) FROM dynamicSiteEventType
-UNION ALL
-SELECT 'dynamicSiteInfo', COUNT(*) FROM dynamicSiteInfo
-UNION ALL
-SELECT 'dynamicSiteDomain', COUNT(*) FROM dynamicSiteDomain
-UNION ALL
-SELECT 'dynamicSiteAIGeneration', COUNT(*) FROM dynamicSiteAIGeneration
-UNION ALL
-SELECT 'dynamicSiteMetric', COUNT(*) FROM dynamicSiteMetric
-UNION ALL
-SELECT 'changeSource', COUNT(*) FROM changeSource
-UNION ALL
-SELECT 'dynamicSiteStatusLog', COUNT(*) FROM dynamicSiteStatusLog
-UNION ALL
-SELECT 'dynamicSiteAuditLog', COUNT(*) FROM dynamicSiteAuditLog
-UNION ALL
-SELECT 'customer', COUNT(*) FROM customer
-UNION ALL
-SELECT 'orderStatus', COUNT(*) FROM orderStatus
-UNION ALL
-SELECT 'customerOrder', COUNT(*) FROM customerOrder
-UNION ALL
-SELECT 'customerOrderStatusLog', COUNT(*) FROM customerOrderStatusLog
-UNION ALL
-SELECT 'productCategory', COUNT(*) FROM productCategory
-UNION ALL
-SELECT 'product', COUNT(*) FROM product
-UNION ALL
-SELECT 'productPrice', COUNT(*) FROM productPrice
-UNION ALL
-SELECT 'productImageType', COUNT(*) FROM productImageType
-UNION ALL
-SELECT 'productImage', COUNT(*) FROM productImage
-UNION ALL
-SELECT 'packagingType', COUNT(*) FROM packagingType
-UNION ALL
-SELECT 'productPackaging', COUNT(*) FROM productPackaging
-UNION ALL
-SELECT 'labelType', COUNT(*) FROM labelType
-UNION ALL
-SELECT 'productLabel', COUNT(*) FROM productLabel
-UNION ALL
-SELECT 'regulatoryRequirementType', COUNT(*) FROM regulatoryRequirementType
-UNION ALL
-SELECT 'permissionStatus', COUNT(*) FROM permissionStatus
-UNION ALL
-SELECT 'countryProductRequirement', COUNT(*) FROM countryProductRequirement
-UNION ALL
-SELECT 'countryProductPermission', COUNT(*) FROM countryProductPermission
-UNION ALL
-SELECT 'inventorySource', COUNT(*) FROM inventorySource
-UNION ALL
-SELECT 'inventory', COUNT(*) FROM inventory
-UNION ALL
-SELECT 'paymentMethod', COUNT(*) FROM paymentMethod
-UNION ALL
-SELECT 'paymentTransactionStatus', COUNT(*) FROM paymentTransactionStatus
-UNION ALL
-SELECT 'paymentProvider', COUNT(*) FROM paymentProvider
-UNION ALL
-SELECT 'paymentTransaction', COUNT(*) FROM paymentTransaction
-UNION ALL
-SELECT 'shipmentViewType', COUNT(*) FROM shipmentViewType
-UNION ALL
-SELECT 'shipmentStatus', COUNT(*) FROM shipmentStatus
-UNION ALL
-SELECT 'shipment', COUNT(*) FROM shipment
-UNION ALL
-SELECT 'etlExecutionLog', COUNT(*) FROM etlExecutionLog
-ORDER BY tableName;
+SELECT 'currencyWithoutCode' AS checkerName, COUNT(*) AS issueCount
+FROM currency
+WHERE currencyCode IS NULL OR TRIM(currencyCode) = '';
 
-SELECT c.countryID, c.countryName
+SELECT 'duplicateCurrencyCode' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT currencyCode
+    FROM currency
+    GROUP BY currencyCode
+    HAVING COUNT(*) > 1
+) duplicatedCurrencies;
+
+SELECT 'countryWithoutLocalCurrency' AS checkerName, COUNT(*) AS issueCount
 FROM country c
 LEFT JOIN currency cur ON c.localCurrencyID = cur.currencyID
 WHERE cur.currencyID IS NULL;
 
-SELECT ep.exchangePairID, ep.baseCurrencyID, ep.quoteCurrencyID
-FROM exchangePair ep
-LEFT JOIN currency c1 ON ep.baseCurrencyID = c1.currencyID
-LEFT JOIN currency c2 ON ep.quoteCurrencyID = c2.currencyID
-WHERE c1.currencyID IS NULL OR c2.currencyID IS NULL;
+SELECT 'invalidCountryIsoCodes' AS checkerName, COUNT(*) AS issueCount
+FROM country
+WHERE CHAR_LENGTH(iso2Code) <> 2
+   OR CHAR_LENGTH(iso3Code) <> 3;
 
-SELECT cer.currentExchangeRateID, cer.exchangePairID
-FROM currentExchangeRate cer
-LEFT JOIN exchangePair ep ON cer.exchangePairID = ep.exchangePairID
-WHERE ep.exchangePairID IS NULL;
+SELECT 'exchangeRateSameCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM currentExchangeRate
+WHERE baseCurrencyID = quoteCurrencyID;
 
-SELECT her.historicalExchangeRateID, her.exchangePairID
-FROM historicalExchangeRate her
-LEFT JOIN exchangePair ep ON her.exchangePairID = ep.exchangePairID
-WHERE ep.exchangePairID IS NULL;
+SELECT 'exchangeRateInvalidRates' AS checkerName, COUNT(*) AS issueCount
+FROM currentExchangeRate
+WHERE buyRate <= 0
+   OR sellRate <= 0;
 
-SELECT u.userID, u.roleCode
-FROM userInfo u
-LEFT JOIN userRole r ON u.roleCode = r.roleCode
-WHERE r.roleCode IS NULL;
+SELECT 'historicalExchangeRateInvalidDates' AS checkerName, COUNT(*) AS issueCount
+FROM historicalExchangeRate
+WHERE validTo IS NOT NULL
+  AND validTo < validFrom;
 
-SELECT ds.dynamicSiteID, ds.brandCode, ds.countryID, ds.currencyID, ds.siteStatusCode
-FROM dynamicSiteInfo ds
-LEFT JOIN brandTemplate bt ON ds.brandCode = bt.brandCode
-LEFT JOIN country c ON ds.countryID = c.countryID
-LEFT JOIN currency cur ON ds.currencyID = cur.currencyID
-LEFT JOIN dynamicSiteStatus st ON ds.siteStatusCode = st.statusCode
-WHERE bt.brandCode IS NULL
-   OR c.countryID IS NULL
-   OR cur.currencyID IS NULL
-   OR st.statusCode IS NULL;
-
-SELECT dsd.dynamicSiteDomainID, dsd.dynamicSiteID
-FROM dynamicSiteDomain dsd
-LEFT JOIN dynamicSiteInfo ds ON dsd.dynamicSiteID = ds.dynamicSiteID
-WHERE ds.dynamicSiteID IS NULL;
-
-SELECT dsa.dynamicSiteAIGenerationID, dsa.dynamicSiteID, dsa.generationStatusCode
-FROM dynamicSiteAIGeneration dsa
-LEFT JOIN dynamicSiteInfo ds ON dsa.dynamicSiteID = ds.dynamicSiteID
-LEFT JOIN dynamicSiteGenerationStatus gs ON dsa.generationStatusCode = gs.statusCode
-WHERE ds.dynamicSiteID IS NULL
-   OR gs.statusCode IS NULL;
-
-SELECT dsm.dynamicSiteMetricID, dsm.dynamicSiteID
-FROM dynamicSiteMetric dsm
-LEFT JOIN dynamicSiteInfo ds ON dsm.dynamicSiteID = ds.dynamicSiteID
-WHERE ds.dynamicSiteID IS NULL;
-
-SELECT cu.customerID, cu.countryID
-FROM customer cu
-LEFT JOIN country c ON cu.countryID = c.countryID
+SELECT 'peopleWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM people p
+LEFT JOIN country c ON p.countryID = c.countryID
 WHERE c.countryID IS NULL;
 
-SELECT co.customerOrderID, co.customerID, co.dynamicSiteID, co.customerCountryID, co.currencyID, co.orderStatusCode
+SELECT 'peopleWithoutEmail' AS checkerName, COUNT(*) AS issueCount
+FROM people
+WHERE email IS NULL OR TRIM(email) = '';
+
+SELECT 'duplicatePeopleEmail' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT email
+    FROM people
+    GROUP BY email
+    HAVING COUNT(*) > 1
+) duplicatedEmails;
+
+SELECT 'peopleWithoutPersonType' AS checkerName, COUNT(*) AS issueCount
+FROM people p
+LEFT JOIN peoplePersonType ppt ON p.personID = ppt.personID
+WHERE ppt.peoplePersonTypeID IS NULL;
+
+SELECT 'systemUserWithoutPerson' AS checkerName, COUNT(*) AS issueCount
+FROM systemUser su
+LEFT JOIN people p ON su.personID = p.personID
+WHERE p.personID IS NULL;
+
+SELECT 'systemUserWithoutRole' AS checkerName, COUNT(*) AS issueCount
+FROM systemUser su
+LEFT JOIN userRole ur ON su.roleCode = ur.roleCode
+WHERE ur.roleCode IS NULL;
+
+SELECT 'dynamicSiteWithoutBrand' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+LEFT JOIN brandTemplate bt ON dsi.brandCode = bt.brandCode
+WHERE bt.brandCode IS NULL;
+
+SELECT 'dynamicSiteWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+LEFT JOIN country c ON dsi.countryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'dynamicSiteWithoutCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+LEFT JOIN currency cur ON dsi.currencyID = cur.currencyID
+WHERE cur.currencyID IS NULL;
+
+SELECT 'dynamicSiteWithoutStatus' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+LEFT JOIN dynamicSiteStatus dss ON dsi.siteStatusCode = dss.statusCode
+WHERE dss.statusCode IS NULL;
+
+SELECT 'dynamicSiteClosedWithoutCloseDate' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo
+WHERE siteStatusCode = 'CLOSED'
+  AND closeDate IS NULL;
+
+SELECT 'dynamicSiteActiveWithCloseDate' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo
+WHERE siteStatusCode = 'ACTIVE'
+  AND closeDate IS NOT NULL;
+
+SELECT 'dynamicSiteWithoutPrimaryDomain' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo
+WHERE primaryDomainName IS NULL
+   OR TRIM(primaryDomainName) = '';
+
+SELECT 'dynamicSiteDomainWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteDomain dsd
+LEFT JOIN dynamicSiteInfo dsi ON dsd.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
+
+SELECT 'dynamicSiteWithoutMetrics' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+LEFT JOIN dynamicSiteMetric dsm ON dsi.dynamicSiteID = dsm.dynamicSiteID
+WHERE dsm.dynamicSiteMetricID IS NULL;
+
+SELECT 'metricWithoutMetricType' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteMetric dsm
+LEFT JOIN metricType mt ON dsm.metricTypeCode = mt.metricTypeCode
+WHERE mt.metricTypeCode IS NULL;
+
+SELECT 'negativeMetricValues' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteMetric
+WHERE metricValue < 0;
+
+SELECT 'conversionRateOutOfRange' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteMetric
+WHERE metricTypeCode = 'CONVERSION_RATE'
+  AND (metricValue < 0 OR metricValue > 1);
+
+SELECT 'duplicateSiteMetricByDate' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT dynamicSiteID, metricTypeCode, metricDate
+    FROM dynamicSiteMetric
+    GROUP BY dynamicSiteID, metricTypeCode, metricDate
+    HAVING COUNT(*) > 1
+) duplicatedMetrics;
+
+SELECT 'ordersWithoutPerson' AS checkerName, COUNT(*) AS issueCount
 FROM customerOrder co
-LEFT JOIN customer cu ON co.customerID = cu.customerID
-LEFT JOIN dynamicSiteInfo ds ON co.dynamicSiteID = ds.dynamicSiteID
+LEFT JOIN people p ON co.personID = p.personID
+WHERE p.personID IS NULL;
+
+SELECT 'ordersWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
+LEFT JOIN dynamicSiteInfo dsi ON co.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
+
+SELECT 'ordersWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
 LEFT JOIN country c ON co.customerCountryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'ordersWithoutCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
 LEFT JOIN currency cur ON co.currencyID = cur.currencyID
+WHERE cur.currencyID IS NULL;
+
+SELECT 'ordersWithoutStatus' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
 LEFT JOIN orderStatus os ON co.orderStatusCode = os.statusCode
-WHERE cu.customerID IS NULL
-   OR ds.dynamicSiteID IS NULL
-   OR c.countryID IS NULL
-   OR cur.currencyID IS NULL
-   OR os.statusCode IS NULL;
+WHERE os.statusCode IS NULL;
 
-SELECT col.customerOrderStatusLogID, col.customerOrderID, col.currentOrderStatusCode, col.changeSourceCode
-FROM customerOrderStatusLog col
-LEFT JOIN customerOrder co ON col.customerOrderID = co.customerOrderID
-LEFT JOIN orderStatus os ON col.currentOrderStatusCode = os.statusCode
-LEFT JOIN changeSource cs ON col.changeSourceCode = cs.sourceCode
-WHERE co.customerOrderID IS NULL
-   OR os.statusCode IS NULL
-   OR cs.sourceCode IS NULL;
+SELECT 'ordersWithoutDetails' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
+LEFT JOIN customerOrderDetail cod ON co.customerOrderID = cod.customerOrderID
+WHERE cod.customerOrderDetailID IS NULL;
 
-SELECT p.productID, p.dynamicSiteID, p.categoryCode, p.baseCurrencyID, p.updatedByUserID
+SELECT 'orderDetailsWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail cod
+LEFT JOIN product p ON cod.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'orderDetailsInvalidQuantity' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail
+WHERE quantity <= 0;
+
+SELECT 'orderDetailsInvalidUnitPrice' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail
+WHERE unitPrice < 0;
+
+SELECT 'orderDetailsNegativeTax' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail
+WHERE taxAmount < 0;
+
+SELECT 'orderDetailsNegativeDiscount' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail
+WHERE discountAmount < 0;
+
+SELECT 'orderDetailLineTotalMismatch' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderDetail
+WHERE ROUND(lineTotal, 6) <> ROUND((quantity * unitPrice) + taxAmount - discountAmount, 6);
+
+SELECT 'orderTotalsMismatch' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
+JOIN (
+    SELECT
+        customerOrderID,
+        SUM(quantity * unitPrice) AS calculatedSubTotal,
+        SUM(taxAmount) AS calculatedTaxTotal,
+        SUM(lineTotal) AS calculatedLineTotal
+    FROM customerOrderDetail
+    GROUP BY customerOrderID
+) orderDetailTotals ON co.customerOrderID = orderDetailTotals.customerOrderID
+WHERE ROUND(co.subTotal, 6) <> ROUND(orderDetailTotals.calculatedSubTotal, 6)
+   OR ROUND(co.taxTotal, 6) <> ROUND(orderDetailTotals.calculatedTaxTotal, 6)
+   OR ROUND(co.totalAmount, 6) <> ROUND(orderDetailTotals.calculatedLineTotal + co.shippingAmount, 6);
+
+SELECT 'ordersWithNegativeAmounts' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder
+WHERE subTotal < 0
+   OR taxTotal < 0
+   OR shippingAmount < 0
+   OR totalAmount < 0;
+
+SELECT 'ordersWithInvalidExchangeRate' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder
+WHERE exchangeRate <= 0;
+
+SELECT 'productWithoutSite' AS checkerName, COUNT(*) AS issueCount
 FROM product p
-LEFT JOIN dynamicSiteInfo ds ON p.dynamicSiteID = ds.dynamicSiteID
-LEFT JOIN productCategory pc ON p.categoryCode = pc.categoryCode
+LEFT JOIN dynamicSiteInfo dsi ON p.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
+
+SELECT 'productWithoutCategory' AS checkerName, COUNT(*) AS issueCount
+FROM product p
+LEFT JOIN productCategory pc ON p.productCategoryCode = pc.categoryCode
+WHERE pc.categoryCode IS NULL;
+
+SELECT 'productWithoutBaseCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM product p
 LEFT JOIN currency cur ON p.baseCurrencyID = cur.currencyID
-LEFT JOIN userInfo u ON p.updatedByUserID = u.userID
-WHERE ds.dynamicSiteID IS NULL
-   OR pc.categoryCode IS NULL
-   OR cur.currencyID IS NULL
-   OR (p.updatedByUserID IS NOT NULL AND u.userID IS NULL);
+WHERE cur.currencyID IS NULL;
 
-SELECT pp.productPriceID, pp.productID, pp.currencyID
+SELECT 'productWithoutUpdaterPerson' AS checkerName, COUNT(*) AS issueCount
+FROM product p
+LEFT JOIN people pe ON p.updatedByPersonID = pe.personID
+WHERE p.updatedByPersonID IS NOT NULL
+  AND pe.personID IS NULL;
+
+SELECT 'duplicateProductCode' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT productCode
+    FROM product
+    GROUP BY productCode
+    HAVING COUNT(*) > 1
+) duplicatedProducts;
+
+SELECT 'duplicateProductSku' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT sku
+    FROM product
+    GROUP BY sku
+    HAVING COUNT(*) > 1
+) duplicatedSkus;
+
+SELECT 'productsWithoutCurrentPrice' AS checkerName, COUNT(*) AS issueCount
+FROM product p
+LEFT JOIN productPrice pp ON p.productID = pp.productID AND pp.isCurrent = TRUE
+WHERE pp.productPriceID IS NULL;
+
+SELECT 'productPriceWithoutSite' AS checkerName, COUNT(*) AS issueCount
 FROM productPrice pp
-LEFT JOIN product p ON pp.productID = p.productID
-LEFT JOIN currency c ON pp.currencyID = c.currencyID
-WHERE p.productID IS NULL
-   OR c.currencyID IS NULL;
+LEFT JOIN dynamicSiteInfo dsi ON pp.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
 
-SELECT pi.productImageID, pi.productID, pi.typeCode
-FROM productImage pi
-LEFT JOIN product p ON pi.productID = p.productID
-LEFT JOIN productImageType pit ON pi.typeCode = pit.typeCode
-WHERE p.productID IS NULL
-   OR pit.typeCode IS NULL;
+SELECT 'productPriceWithoutCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM productPrice pp
+LEFT JOIN currency cur ON pp.currencyID = cur.currencyID
+WHERE cur.currencyID IS NULL;
 
-SELECT pkg.productPackagingID, pkg.productID, pkg.countryID, pkg.packagingTypeCode
-FROM productPackaging pkg
-LEFT JOIN product p ON pkg.productID = p.productID
-LEFT JOIN country c ON pkg.countryID = c.countryID
-LEFT JOIN packagingType pt ON pkg.packagingTypeCode = pt.packagingTypeCode
-WHERE p.productID IS NULL
-   OR c.countryID IS NULL
-   OR pt.packagingTypeCode IS NULL;
-
-SELECT pl.productLabelID, pl.productID, pl.dynamicSiteID, pl.countryID, pl.labelTypeCode
-FROM productLabel pl
-LEFT JOIN product p ON pl.productID = p.productID
-LEFT JOIN dynamicSiteInfo ds ON pl.dynamicSiteID = ds.dynamicSiteID
-LEFT JOIN country c ON pl.countryID = c.countryID
-LEFT JOIN labelType lt ON pl.labelTypeCode = lt.labelTypeCode
-WHERE p.productID IS NULL
-   OR ds.dynamicSiteID IS NULL
-   OR c.countryID IS NULL
-   OR lt.labelTypeCode IS NULL;
-
-SELECT cpr.countryProductRequirementID, cpr.productID, cpr.countryID, cpr.requirementTypeCode
-FROM countryProductRequirement cpr
-LEFT JOIN product p ON cpr.productID = p.productID
-LEFT JOIN country c ON cpr.countryID = c.countryID
-LEFT JOIN regulatoryRequirementType rrt ON cpr.requirementTypeCode = rrt.requirementTypeCode
-WHERE p.productID IS NULL
-   OR c.countryID IS NULL
-   OR rrt.requirementTypeCode IS NULL;
-
-SELECT cpp.countryProductPermissionID, cpp.productID, cpp.countryID, cpp.permissionStatusCode
-FROM countryProductPermission cpp
-LEFT JOIN product p ON cpp.productID = p.productID
-LEFT JOIN country c ON cpp.countryID = c.countryID
-LEFT JOIN permissionStatus ps ON cpp.permissionStatusCode = ps.statusCode
-WHERE p.productID IS NULL
-   OR c.countryID IS NULL
-   OR ps.statusCode IS NULL;
-
-SELECT i.inventoryID, i.dynamicSiteID, i.productID, i.sourceCode
-FROM inventory i
-LEFT JOIN dynamicSiteInfo ds ON i.dynamicSiteID = ds.dynamicSiteID
-LEFT JOIN product p ON i.productID = p.productID
-LEFT JOIN inventorySource s ON i.sourceCode = s.sourceCode
-WHERE ds.dynamicSiteID IS NULL
-   OR p.productID IS NULL
-   OR s.sourceCode IS NULL;
-
-SELECT pt.paymentTransactionID, pt.customerOrderID, pt.methodCode, pt.paymentStatusCode, pt.providerCode, pt.currencyID
-FROM paymentTransaction pt
-LEFT JOIN customerOrder co ON pt.customerOrderID = co.customerOrderID
-LEFT JOIN paymentMethod pm ON pt.methodCode = pm.methodCode
-LEFT JOIN paymentTransactionStatus ps ON pt.paymentStatusCode = ps.statusCode
-LEFT JOIN paymentProvider pp ON pt.providerCode = pp.providerCode
-LEFT JOIN currency c ON pt.currencyID = c.currencyID
-WHERE co.customerOrderID IS NULL
-   OR pm.methodCode IS NULL
-   OR ps.statusCode IS NULL
-   OR pp.providerCode IS NULL
-   OR c.currencyID IS NULL;
-
-SELECT s.shipmentID, s.customerOrderID, s.shipmentStatusCode, s.viewTypeCode
-FROM shipment s
-LEFT JOIN customerOrder co ON s.customerOrderID = co.customerOrderID
-LEFT JOIN shipmentStatus ss ON s.shipmentStatusCode = ss.statusCode
-LEFT JOIN shipmentViewType svt ON s.viewTypeCode = svt.viewTypeCode
-WHERE co.customerOrderID IS NULL
-   OR ss.statusCode IS NULL
-   OR svt.viewTypeCode IS NULL;
-
-SELECT 'duplicate currencyCode' AS validationType, currencyCode AS duplicateValue, COUNT(*) AS total
-FROM currency
-GROUP BY currencyCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate userCode', userCode, COUNT(*)
-FROM userInfo
-GROUP BY userCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate user email', email, COUNT(*)
-FROM userInfo
-GROUP BY email
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate customerCode', customerCode, COUNT(*)
-FROM customer
-GROUP BY customerCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate customer email', email, COUNT(*)
-FROM customer
-GROUP BY email
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate siteCode', siteCode, COUNT(*)
-FROM dynamicSiteInfo
-GROUP BY siteCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate primaryDomainName', primaryDomainName, COUNT(*)
-FROM dynamicSiteInfo
-GROUP BY primaryDomainName
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate orderCode', orderCode, COUNT(*)
-FROM customerOrder
-GROUP BY orderCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate productCode', productCode, COUNT(*)
-FROM product
-GROUP BY productCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate sku', sku, COUNT(*)
-FROM product
-GROUP BY sku
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate transactionCode', transactionCode, COUNT(*)
-FROM paymentTransaction
-GROUP BY transactionCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate shipmentCode', shipmentCode, COUNT(*)
-FROM shipment
-GROUP BY shipmentCode
-HAVING COUNT(*) > 1
-UNION ALL
-SELECT 'duplicate permissionCode', permissionCode, COUNT(*)
-FROM countryProductPermission
-GROUP BY permissionCode
-HAVING COUNT(*) > 1;
-
-SELECT customerOrderID, subTotal, taxTotal, shippingAmount, totalAmount,
-       ROUND(subTotal + taxTotal + shippingAmount, 6) AS expectedTotal
-FROM customerOrder
-WHERE ROUND(subTotal + taxTotal + shippingAmount, 6) <> ROUND(totalAmount, 6);
-
-SELECT productID, priceAmount, validFrom, validTo
+SELECT 'productPriceInvalidDates' AS checkerName, COUNT(*) AS issueCount
 FROM productPrice
 WHERE validTo IS NOT NULL
   AND validTo < validFrom;
 
-SELECT countryProductPermissionID, issuedAt, expiresAt
+SELECT 'productPriceInvalidAmount' AS checkerName, COUNT(*) AS issueCount
+FROM productPrice
+WHERE priceAmount < 0;
+
+SELECT 'duplicateCurrentProductPrice' AS checkerName, COUNT(*) AS issueCount
+FROM (
+    SELECT productID, dynamicSiteID, currencyID
+    FROM productPrice
+    WHERE isCurrent = TRUE
+    GROUP BY productID, dynamicSiteID, currencyID
+    HAVING COUNT(*) > 1
+) duplicatedCurrentPrices;
+
+SELECT 'productImagesWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM productImage pi
+LEFT JOIN product p ON pi.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'productImagesWithoutType' AS checkerName, COUNT(*) AS issueCount
+FROM productImage pi
+LEFT JOIN productImageType pit ON pi.typeCode = pit.typeCode
+WHERE pit.typeCode IS NULL;
+
+SELECT 'productsWithoutPrimaryImage' AS checkerName, COUNT(*) AS issueCount
+FROM product p
+LEFT JOIN productImage pi ON p.productID = pi.productID AND pi.isPrimary = TRUE
+WHERE pi.productImageID IS NULL;
+
+SELECT 'productPackagingWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM productPackaging pp
+LEFT JOIN product p ON pp.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'productPackagingWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM productPackaging pp
+LEFT JOIN country c ON pp.countryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'productPackagingWithoutType' AS checkerName, COUNT(*) AS issueCount
+FROM productPackaging pp
+LEFT JOIN packagingType pt ON pp.packagingTypeCode = pt.packagingTypeCode
+WHERE pt.packagingTypeCode IS NULL;
+
+SELECT 'productLabelsWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM productLabel pl
+LEFT JOIN product p ON pl.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'productLabelsWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM productLabel pl
+LEFT JOIN dynamicSiteInfo dsi ON pl.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
+
+SELECT 'productLabelsWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM productLabel pl
+LEFT JOIN country c ON pl.countryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'productLabelsWithoutType' AS checkerName, COUNT(*) AS issueCount
+FROM productLabel pl
+LEFT JOIN labelType lt ON pl.labelTypeCode = lt.labelTypeCode
+WHERE lt.labelTypeCode IS NULL;
+
+SELECT 'requirementsWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductRequirement cpr
+LEFT JOIN product p ON cpr.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'requirementsWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductRequirement cpr
+LEFT JOIN country c ON cpr.countryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'requirementsWithoutType' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductRequirement cpr
+LEFT JOIN regulatoryRequirementType rrt ON cpr.requirementTypeCode = rrt.requirementTypeCode
+WHERE rrt.requirementTypeCode IS NULL;
+
+SELECT 'requirementsInvalidDates' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductRequirement
+WHERE validTo IS NOT NULL
+  AND validTo < validFrom;
+
+SELECT 'permissionsWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission cpp
+LEFT JOIN product p ON cpp.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'permissionsWithoutCountry' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission cpp
+LEFT JOIN country c ON cpp.countryID = c.countryID
+WHERE c.countryID IS NULL;
+
+SELECT 'permissionsWithoutStatus' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission cpp
+LEFT JOIN permissionStatus ps ON cpp.permissionStatusCode = ps.statusCode
+WHERE ps.statusCode IS NULL;
+
+SELECT 'permissionsInvalidDates' AS checkerName, COUNT(*) AS issueCount
 FROM countryProductPermission
 WHERE expiresAt IS NOT NULL
   AND issuedAt IS NOT NULL
   AND expiresAt < issuedAt;
 
-SELECT shipmentID, shippedAt, deliveredAt
+SELECT 'expiredApprovedPermissions' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission
+WHERE permissionStatusCode = 'APPROVED'
+  AND expiresAt IS NOT NULL
+  AND expiresAt < CURRENT_TIMESTAMP;
+
+SELECT 'permissionsExpiringNext30Days' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission
+WHERE expiresAt IS NOT NULL
+  AND expiresAt BETWEEN CURRENT_TIMESTAMP AND DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 DAY);
+
+SELECT 'negativePermissionCost' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission
+WHERE permissionCost < 0;
+
+SELECT 'inventoryWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM inventory i
+LEFT JOIN dynamicSiteInfo dsi ON i.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
+
+SELECT 'inventoryWithoutProduct' AS checkerName, COUNT(*) AS issueCount
+FROM inventory i
+LEFT JOIN product p ON i.productID = p.productID
+WHERE p.productID IS NULL;
+
+SELECT 'inventoryWithoutSource' AS checkerName, COUNT(*) AS issueCount
+FROM inventory i
+LEFT JOIN inventorySource ins ON i.sourceCode = ins.sourceCode
+WHERE ins.sourceCode IS NULL;
+
+SELECT 'negativeInventory' AS checkerName, COUNT(*) AS issueCount
+FROM inventory
+WHERE availableQuantity < 0
+   OR reservedQuantity < 0
+   OR sellableQuantity < 0
+   OR reorderLevel < 0;
+
+SELECT 'inventoryCalculationMismatch' AS checkerName, COUNT(*) AS issueCount
+FROM inventory
+WHERE sellableQuantity <> availableQuantity - reservedQuantity;
+
+SELECT 'productsWithoutInventory' AS checkerName, COUNT(*) AS issueCount
+FROM product p
+LEFT JOIN inventory i ON p.productID = i.productID AND p.dynamicSiteID = i.dynamicSiteID
+WHERE i.inventoryID IS NULL;
+
+SELECT 'stockBelowReorderLevel' AS checkerName, COUNT(*) AS issueCount
+FROM inventory
+WHERE sellableQuantity <= reorderLevel;
+
+SELECT 'inactiveSitesWithActiveInventory' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteInfo dsi
+JOIN inventory i ON dsi.dynamicSiteID = i.dynamicSiteID
+WHERE dsi.isActive = FALSE
+  AND i.sellableQuantity > 0;
+
+SELECT 'paymentsWithoutOrder' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction pt
+LEFT JOIN customerOrder co ON pt.customerOrderID = co.customerOrderID
+WHERE co.customerOrderID IS NULL;
+
+SELECT 'paymentsWithoutMethod' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction pt
+LEFT JOIN paymentMethod pm ON pt.methodCode = pm.methodCode
+WHERE pm.methodCode IS NULL;
+
+SELECT 'paymentsWithoutStatus' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction pt
+LEFT JOIN paymentTransactionStatus pts ON pt.paymentStatusCode = pts.statusCode
+WHERE pts.statusCode IS NULL;
+
+SELECT 'paymentsWithoutCurrency' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction pt
+LEFT JOIN currency cur ON pt.currencyID = cur.currencyID
+WHERE cur.currencyID IS NULL;
+
+SELECT 'paymentsInvalidAmount' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction
+WHERE transactionAmount < 0;
+
+SELECT 'paymentsInvalidExchangeRate' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction
+WHERE exchangeRate <= 0;
+
+SELECT 'paymentsChecksumMismatch' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction
+WHERE checksum <> SHA2(CONCAT(
+    transactionCode,
+    '|',
+    customerOrderID,
+    '|',
+    methodCode,
+    '|',
+    paymentStatusCode,
+    '|',
+    transactionAmount,
+    '|',
+    currencyID,
+    '|',
+    exchangeRate
+), 256);
+
+SELECT 'approvedPaymentAmountDifferentFromOrder' AS checkerName, COUNT(*) AS issueCount
+FROM paymentTransaction pt
+JOIN customerOrder co ON pt.customerOrderID = co.customerOrderID
+WHERE pt.paymentStatusCode = 'APPROVED'
+  AND ROUND(pt.transactionAmount, 6) <> ROUND(co.totalAmount, 6);
+
+SELECT 'ordersWithoutApprovedPayment' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
+LEFT JOIN paymentTransaction pt 
+    ON co.customerOrderID = pt.customerOrderID 
+   AND pt.paymentStatusCode = 'APPROVED'
+WHERE co.orderStatusCode IN ('PAID', 'SHIPPED', 'DELIVERED')
+  AND pt.paymentTransactionID IS NULL;
+
+SELECT 'shipmentsWithoutOrder' AS checkerName, COUNT(*) AS issueCount
+FROM shipment s
+LEFT JOIN customerOrder co ON s.customerOrderID = co.customerOrderID
+WHERE co.customerOrderID IS NULL;
+
+SELECT 'shipmentsWithoutStatus' AS checkerName, COUNT(*) AS issueCount
+FROM shipment s
+LEFT JOIN shipmentStatus ss ON s.shipmentStatusCode = ss.statusCode
+WHERE ss.statusCode IS NULL;
+
+SELECT 'shipmentsWithoutViewType' AS checkerName, COUNT(*) AS issueCount
+FROM shipment s
+LEFT JOIN shipmentViewType svt ON s.viewTypeCode = svt.viewTypeCode
+WHERE svt.viewTypeCode IS NULL;
+
+SELECT 'ordersWithoutShipment' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrder co
+LEFT JOIN shipment s ON co.customerOrderID = s.customerOrderID
+WHERE s.shipmentID IS NULL;
+
+SELECT 'shipmentDeliveredWithoutDeliveredAt' AS checkerName, COUNT(*) AS issueCount
+FROM shipment
+WHERE shipmentStatusCode = 'DELIVERED'
+  AND deliveredAt IS NULL;
+
+SELECT 'shipmentInTransitWithoutShippedAt' AS checkerName, COUNT(*) AS issueCount
+FROM shipment
+WHERE shipmentStatusCode = 'IN_TRANSIT'
+  AND shippedAt IS NULL;
+
+SELECT 'shipmentInvalidDates' AS checkerName, COUNT(*) AS issueCount
 FROM shipment
 WHERE deliveredAt IS NOT NULL
   AND shippedAt IS NOT NULL
   AND deliveredAt < shippedAt;
 
-SELECT inventoryID, availableQuantity, reservedQuantity, sellableQuantity
-FROM inventory
-WHERE availableQuantity < 0
-   OR reservedQuantity < 0
-   OR sellableQuantity < 0;
+SELECT 'dynamicSiteStatusLogsWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteStatusLog dssl
+LEFT JOIN dynamicSiteInfo dsi ON dssl.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
 
-SELECT inventoryID, availableQuantity, reservedQuantity, sellableQuantity
-FROM inventory
-WHERE sellableQuantity > availableQuantity;
+SELECT 'dynamicSiteAuditLogsWithoutSite' AS checkerName, COUNT(*) AS issueCount
+FROM dynamicSiteAuditLog dsal
+LEFT JOIN dynamicSiteInfo dsi ON dsal.dynamicSiteID = dsi.dynamicSiteID
+WHERE dsi.dynamicSiteID IS NULL;
 
-SELECT dynamicSiteMetricID, visitCount, sessionCount, purchaseCount, conversionRate
-FROM dynamicSiteMetric
-WHERE visitCount < 0
-   OR sessionCount < 0
-   OR purchaseCount < 0
-   OR conversionRate < 0;
+SELECT 'customerOrderStatusLogsWithoutOrder' AS checkerName, COUNT(*) AS issueCount
+FROM customerOrderStatusLog cosl
+LEFT JOIN customerOrder co ON cosl.customerOrderID = co.customerOrderID
+WHERE co.customerOrderID IS NULL;

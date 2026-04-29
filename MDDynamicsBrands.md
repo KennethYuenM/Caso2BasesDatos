@@ -380,6 +380,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - countryProductPermissionID PK
 - productID bigint
 - countryID bigint
+- permissionCost bigint
 - permissionCode varchar 50
 - permissionName varchar 100
 - permissionStatusCode varchar 30
