@@ -68,8 +68,8 @@ CREATE TABLE RolesXUsuario (
     roleID INT NOT NULL,
     asignado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (usuarioID, roleID),
-    FOREIGN KEY (usuarioID) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (roleID) REFERENCES Roles(roleID)
+    FOREIGN KEY (usuarioID) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION ON UPDATE NO ACTION   
 );
 
 CREATE TABLE PermisosSistema (
@@ -82,8 +82,8 @@ CREATE TABLE PermisosXRole (
     roleID INT NOT NULL,
     permisoID INT NOT NULL,
     PRIMARY KEY (roleID, permisoID),
-    FOREIGN KEY (roleID) REFERENCES Roles(roleID),
-    FOREIGN KEY (permisoID) REFERENCES PermisosSistema(permisoID)
+    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (permisoID) REFERENCES PermisosSistema(permisoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -99,7 +99,7 @@ CREATE TABLE TablasSistema (
 
 CREATE TABLE Acciones (
     accionID SERIAL PRIMARY KEY,
-    nombreAccion VARCHAR(10) NOT NULL CHECK (nombreAccion IN ('CREATE','READ','UPDATE','DELETE'))
+    nombreAccion VARCHAR(10) NOT NULL CHECK (nombreAccion IN ('CREATE','UPDATE','DELETE','ERROR'))
 );
 
 CREATE TABLE Logs (
@@ -113,9 +113,9 @@ CREATE TABLE Logs (
     hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     error TEXT,
     checksum TEXT,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (tablaID) REFERENCES TablasSistema(tablaID),
-    FOREIGN KEY (accionID) REFERENCES Acciones(accionID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tablaID) REFERENCES TablasSistema(tablaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (accionID) REFERENCES Acciones(accionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -143,9 +143,9 @@ CREATE TABLE DivisionesGeograficas (
     nivelID INT NOT NULL,
     padreID INT,
     nombre VARCHAR(100) NOT NULL,
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID),
-    FOREIGN KEY (nivelID) REFERENCES NivelesGeograficos(nivelID),
-    FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID)
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (nivelID) REFERENCES NivelesGeograficos(nivelID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE Direcciones (
@@ -160,8 +160,8 @@ CREATE TABLE Direcciones (
     direccionCompleta TEXT,
     fechaCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (divisionID) REFERENCES DivisionesGeograficas(divisionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (divisionID) REFERENCES DivisionesGeograficas(divisionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -182,8 +182,8 @@ CREATE TABLE Contactos (
     apellido VARCHAR(50) NOT NULL,
     segundoApellido VARCHAR(50),
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (tipoContactoID) REFERENCES TiposContactos(tipoContactoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (tipoContactoID) REFERENCES TiposContactos(tipoContactoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE TiposTelefonos (
@@ -198,19 +198,19 @@ CREATE TABLE TelefonosContactos (
     usuarioModificacion INT NOT NULL,
     numeroContacto VARCHAR(20) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID),
-    FOREIGN KEY (tipoTelefonosID) REFERENCES TiposTelefonos(tipoTelefonoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoTelefonosID) REFERENCES TiposTelefonos(tipoTelefonoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE CorreosContactos (
-    correoCantactoID SERIAL PRIMARY KEY,
+    correoContactoID SERIAL PRIMARY KEY,
     contactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
     correo VARCHAR(50) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE TiposCentroLogistico (
@@ -227,10 +227,10 @@ CREATE TABLE CentrosLogisticos (
     nombreCentroLogistico VARCHAR(50) NOT NULL,
     telefono VARCHAR(20) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (tipoID) REFERENCES TiposCentroLogistico(tipoID),
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (tipoID) REFERENCES TiposCentroLogistico(tipoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -243,7 +243,7 @@ CREATE TABLE Proveedores (
     direccionID INT NOT NULL,
     nombreProveedor VARCHAR(50) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID)
+    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE ContactosProveedor (
@@ -251,8 +251,8 @@ CREATE TABLE ContactosProveedor (
     contactoID INT NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (proveedorID, contactoID),
-    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID),
-    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID)
+    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -271,13 +271,14 @@ CREATE TABLE Productos (
     categoriaID INT NOT NULL,
     usuarioModificacion INT,
     proveedorID INT NOT NULL,
+    precio DECIMAL(18,6) NOT NULL,
     nombreProducto VARCHAR(40) NOT NULL,
     descripcion VARCHAR(200) NOT NULL,
     descripcionManejo VARCHAR(200) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID)
+    FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE Caracteristicas (
@@ -291,8 +292,8 @@ CREATE TABLE ValorCaracteristicas (
     valor VARCHAR(50) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (productoID, caracteristicaID),
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID),
-    FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID)
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -308,8 +309,8 @@ CREATE TABLE Monedas (
     nombreMoneda VARCHAR(50) NOT NULL,
     tiempoCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE TiposCambio (
@@ -323,13 +324,13 @@ CREATE TABLE TiposCambio (
     checksum VARCHAR(100),
     activo BOOLEAN DEFAULT TRUE,
     CHECK (moneda1ID <> moneda2ID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID)
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE HistorialCambiosMonedas (
-    histotalCambioID SERIAL PRIMARY KEY,
+    historialCambioID SERIAL PRIMARY KEY,
     moneda1ID INT NOT NULL,
     moneda2ID INT NOT NULL,
     tipoCambioID INT NOT NULL,
@@ -339,10 +340,10 @@ CREATE TABLE HistorialCambiosMonedas (
     tipoCambio DECIMAL(18,6) NOT NULL,
     checksum VARCHAR(100),
     horaCambio TIMESTAMP,
-    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION, 
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -368,11 +369,11 @@ CREATE TABLE PermisosImportacion (
     urlDocumentacion TEXT NOT NULL,
     costo DECIMAL(18,6) NOT NULL CHECK (costo >= 0),
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID),
-    FOREIGN KEY (tipoPermisoID) REFERENCES TiposPermisos(tipoPermisoID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoPermisoID) REFERENCES TiposPermisos(tipoPermisoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION, 
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -387,11 +388,11 @@ CREATE TABLE Lotes (
     cantidadProductoLoteDisponible INT NOT NULL CHECK (cantidadProductoLoteDisponible <= cantidadProductoLoteInicial),
     fechaFabricacion TIMESTAMP NOT NULL,
     fechaVencimiento TIMESTAMP,
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID)
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE TipoMovimientosInventario (
-    tipoMovimientoInvetarioID SERIAL PRIMARY KEY,
+    tipoMovimientoInventarioID SERIAL PRIMARY KEY,
     nombreTipoMovimientoInventario VARCHAR(20) NOT NULL
 );
 
@@ -399,12 +400,12 @@ CREATE TABLE MovimientosInventario (
     movimientoID SERIAL PRIMARY KEY,
     loteID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    tipoMovimientoInvetarioID INT NOT NULL,
+    tipoMovimientoInventarioID INT NOT NULL,
     cantidad INT NOT NULL CHECK (cantidad > 0),
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (tipoMovimientoInvetarioID) REFERENCES TipoMovimientosInventario(tipoMovimientoInvetarioID)
+    FOREIGN KEY (loteID) REFERENCES Lotes(loteID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoMovimientoInventarioID) REFERENCES TipoMovimientosInventario(tipoMovimientoInventarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE Inventarios (
@@ -413,8 +414,8 @@ CREATE TABLE Inventarios (
     usuarioModificacion INT,
     cantidadDisponible INT NOT NULL CHECK (cantidadDisponible >= 0),
     ultimaActualizacion TIMESTAMP,
-    FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID)
+    FOREIGN KEY (loteID) REFERENCES Lotes(loteID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -430,13 +431,40 @@ CREATE TABLE HistorialPreciosProducto (
     fechaInicio TIMESTAMP NOT NULL,
     fechaFin TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID)
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
+/*==============================================================*/
+/* 11. IMPUESTOS                                                */
+/*==============================================================*/
+
+CREATE TABLE ImpuestosPais (
+    impuestoID SERIAL PRIMARY KEY,
+    paisID INT NOT NULL,
+    usuarioModificacion INT NOT NULL,
+    monedaID INT NOT NULL,
+    tipoCambioID INT NOT NULL,
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    nombre VARCHAR(50) NOT NULL,
+    valor DECIMAL(5,2) NOT NULL,
+    tipo tipo_impuesto NOT NULL,
+    CHECK (
+        (tipo = 'porcentaje' AND valor > 0 AND valor <= 100)
+        OR
+        (tipo = 'monto_fijo' AND valor > 0)
+    ),
+    fechaInicio TIMESTAMP NOT NULL,
+    fechaFin TIMESTAMP,
+    activo BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
 
 /*==============================================================*/
-/* 11. ORDENES                                                  */
+/* 12. ORDENES                                                  */
 /*==============================================================*/
 
 CREATE TABLE EstadosOrdenes (
@@ -460,15 +488,15 @@ CREATE TABLE Ordenes (
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6) NOT NULL,
     numeroOrden VARCHAR(30) NOT NULL,
-    precioFinal DECIMAL(18,6),
+    precioFinal DECIMAL(18,6) NOT NULL,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID),
-    FOREIGN KEY (tipoOrdenID) REFERENCES TiposOrden(tipoOrdenID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (direccionEnvioID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (direccionEntregaID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoOrdenID) REFERENCES TiposOrden(tipoOrdenID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (direccionEnvioID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (direccionEntregaID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE OrdenDetalles (
@@ -481,30 +509,30 @@ CREATE TABLE OrdenDetalles (
     tipoCambio DECIMAL(18,6) NOT NULL,
     cantidad INT NOT NULL CHECK (cantidad > 0),
     descuentoFinal DECIMAL(18,6) DEFAULT 0,
-    costoEnvio DECIMAL(18,6) NOT NULL,
-    precioLoteFinal DECIMAL(18,6),
+    costoEnvio DECIMAL(18,6) DEFAULT 0,
+    precioLoteFinal DECIMAL(18,6) DEFAULT 0,
     checksum TEXT,
-    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
-    FOREIGN KEY (productoID) REFERENCES Productos(productoID),
-    FOREIGN KEY (loteID) REFERENCES Lotes(loteID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (loteID) REFERENCES Lotes(loteID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE OrdenDetalleImpuestos (
     ordenDetalleID INT,
     impuestoID INT,
     PRIMARY KEY (ordenDetalleID, impuestoID),
-    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID),
-    FOREIGN KEY (impuestoID) REFERENCES ImpuestosPais(impuestoID)
+    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (impuestoID) REFERENCES ImpuestosPais(impuestoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE OrdenDetallePermisos (
     ordenDetalleID INT,
     permisoID INT,
     PRIMARY KEY (ordenDetalleID, permisoID),
-    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID),
-    FOREIGN KEY (permisoID) REFERENCES PermisosImportacion(permisoID)
+    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (permisoID) REFERENCES PermisosImportacion(permisoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE OrdenDetalleDescuentos (
@@ -515,14 +543,14 @@ CREATE TABLE OrdenDetalleDescuentos (
     tipoCambio DECIMAL(18,6) NOT NULL,
     descripcion VARCHAR(100) NOT NULL,
     monto DECIMAL(18,6) NOT NULL,
-    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
 /*==============================================================*/
-/* 12. TRAZABILIDAD                                             */
+/* 13. TRAZABILIDAD                                             */
 /*==============================================================*/
 
 CREATE TABLE TrazabilidadOrden (
@@ -533,42 +561,12 @@ CREATE TABLE TrazabilidadOrden (
     usuarioModificacion INT NOT NULL,
     estadoID INT NOT NULL,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
-    FOREIGN KEY (centroLogisticoID) REFERENCES CentrosLogisticos(centroLogisticoID),
-    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID)
+    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (centroLogisticoID) REFERENCES CentrosLogisticos(centroLogisticoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
-
-
-/*==============================================================*/
-/* 13. IMPUESTOS                                                */
-/*==============================================================*/
-
-CREATE TABLE ImpuestosPais (
-    impuestoID SERIAL PRIMARY KEY,
-    paisID INT NOT NULL,
-    usuarioModificacion INT NOT NULL,
-    monedaID INT NOT NULL,
-    tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6) NOT NULL,
-    nombre VARCHAR(50) NOT NULL,
-    valor DECIMAL(5,2) NOT NULL,
-    CHECK (
-        (tipo = 'porcentaje' AND valor > 0 AND valor <= 100)
-        OR
-        (tipo = 'monto_fijo' AND valor > 0)
-    ),
-    tipo tipo_impuesto NOT NULL,
-    fechaInicio TIMESTAMP NOT NULL,
-    fechaFin TIMESTAMP,
-    activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (paisID) REFERENCES Paises(paisID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
-);
-
 
 /*==============================================================*/
 /* 14. TRANSACCIONES                                            */
@@ -597,12 +595,12 @@ CREATE TABLE Transacciones (
     descripcion TEXT,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     checksum TEXT,
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (tipoID) REFERENCES TipoTransacciones(tipoID),
-    FOREIGN KEY (estadoTransaccionID) REFERENCES EstadoTransacciones(estadoTransaccionID),
-    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoID) REFERENCES TipoTransacciones(tipoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (estadoTransaccionID) REFERENCES EstadoTransacciones(estadoTransaccionID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -618,14 +616,14 @@ CREATE TABLE EstadosCuenta (
     estado estado_cuenta_enum NOT NULL,
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
-    tipoCambio DECIMAL(18,6),
-    monto DECIMAL(18,6),
+    tipoCambio DECIMAL(18,6) NOT NULL,
+    monto DECIMAL(18,6) NOT NULL,
     fechaRegistro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     checksum TEXT,
-    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID),
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID),
-    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID),
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID)
+    FOREIGN KEY (ordenID) REFERENCES Ordenes(ordenID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE BalanceNeto (
