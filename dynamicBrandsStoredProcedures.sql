@@ -2,6 +2,9 @@ USE dynamicBrandsDB;
 
 DELIMITER $$
 
+-- =========================================================
+-- SP DE LOGGING: registra cada paso ejecutado por los demas SP
+-- =========================================================
 DROP PROCEDURE IF EXISTS spLogEtlStep $$
 CREATE PROCEDURE spLogEtlStep(
     IN processNameParam VARCHAR(60),
@@ -39,16 +42,16 @@ BEGIN
     );
 END $$
 
+-- =========================================================
+-- SP DE CATALOGOS BASE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spSeedBaseCatalogs $$
 CREATE PROCEDURE spSeedBaseCatalogs()
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spSeedBaseCatalogs', 'MANUAL', 'dynamicBrandsDB', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spSeedBaseCatalogs', 'MANUAL', 'dynamicBrandsDB', 'ERROR', 0, 0, 'Error al insertar catalogos base');
     END;
 
     START TRANSACTION;
@@ -170,6 +173,9 @@ BEGIN
     CALL spLogEtlStep('spSeedBaseCatalogs', 'MANUAL', 'dynamicBrandsDB', 'SUCCESS', 0, 0, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: CURRENCY
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCurrency $$
 CREATE PROCEDURE spInsertCurrency(
     IN currencyCodeParam VARCHAR(20),
@@ -177,13 +183,10 @@ CREATE PROCEDURE spInsertCurrency(
     IN currencySymbolParam VARCHAR(30)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCurrency', 'MANUAL', 'currency', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCurrency', 'MANUAL', 'currency', 'ERROR', 0, 0, 'Error al insertar moneda');
     END;
 
     START TRANSACTION;
@@ -199,6 +202,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCurrency', 'MANUAL', 'currency', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: COUNTRY
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountry $$
 CREATE PROCEDURE spInsertCountry(
     IN countryNameParam VARCHAR(50),
@@ -207,13 +213,10 @@ CREATE PROCEDURE spInsertCountry(
     IN localCurrencyIDParam BIGINT
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCountry', 'MANUAL', 'country', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCountry', 'MANUAL', 'country', 'ERROR', 0, 0, 'Error al insertar pais');
     END;
 
     START TRANSACTION;
@@ -229,6 +232,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCountry', 'MANUAL', 'country', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: CURRENT EXCHANGE RATE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCurrentExchangeRate $$
 CREATE PROCEDURE spInsertCurrentExchangeRate(
     IN exchangePairIDParam BIGINT,
@@ -239,13 +245,12 @@ CREATE PROCEDURE spInsertCurrentExchangeRate(
     IN sourceNameParam VARCHAR(50)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
+    DECLARE existingCount INT DEFAULT 0;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCurrentExchangeRate', 'MANUAL', 'currentExchangeRate', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCurrentExchangeRate', 'MANUAL', 'currentExchangeRate', 'ERROR', 0, 0, 'Error al insertar tipo de cambio');
     END;
 
     START TRANSACTION;
@@ -258,28 +263,38 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Exchange rates must be greater than zero';
     END IF;
 
-    INSERT INTO currentExchangeRate (
-        exchangePairID,
-        baseCurrencyID,
-        quoteCurrencyID,
-        buyRate,
-        sellRate,
-        sourceName
-    )
-    VALUES (
-        exchangePairIDParam,
-        baseCurrencyIDParam,
-        quoteCurrencyIDParam,
-        buyRateParam,
-        sellRateParam,
-        sourceNameParam
-    )
-    ON DUPLICATE KEY UPDATE
-        exchangePairID = exchangePairIDParam,
-        buyRate = buyRateParam,
-        sellRate = sellRateParam,
-        sourceName = sourceNameParam,
-        updatedAt = CURRENT_TIMESTAMP;
+    SELECT COUNT(*) INTO existingCount
+    FROM currentExchangeRate
+    WHERE baseCurrencyID = baseCurrencyIDParam
+      AND quoteCurrencyID = quoteCurrencyIDParam;
+
+    IF existingCount > 0 THEN
+        UPDATE currentExchangeRate
+        SET exchangePairID = exchangePairIDParam,
+            buyRate = buyRateParam,
+            sellRate = sellRateParam,
+            sourceName = sourceNameParam,
+            updatedAt = CURRENT_TIMESTAMP
+        WHERE baseCurrencyID = baseCurrencyIDParam
+          AND quoteCurrencyID = quoteCurrencyIDParam;
+    ELSE
+        INSERT INTO currentExchangeRate (
+            exchangePairID,
+            baseCurrencyID,
+            quoteCurrencyID,
+            buyRate,
+            sellRate,
+            sourceName
+        )
+        VALUES (
+            exchangePairIDParam,
+            baseCurrencyIDParam,
+            quoteCurrencyIDParam,
+            buyRateParam,
+            sellRateParam,
+            sourceNameParam
+        );
+    END IF;
 
     INSERT INTO historicalExchangeRate (
         exchangePairID,
@@ -302,6 +317,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCurrentExchangeRate', 'MANUAL', 'currentExchangeRate', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PEOPLE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertPeople $$
 CREATE PROCEDURE spInsertPeople(
     IN personCodeParam VARCHAR(50),
@@ -314,14 +332,11 @@ CREATE PROCEDURE spInsertPeople(
     OUT newPersonIDParam BIGINT
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
         SET newPersonIDParam = NULL;
-        CALL spLogEtlStep('spInsertPeople', 'MANUAL', 'people', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertPeople', 'MANUAL', 'people', 'ERROR', 0, 0, 'Error al insertar persona');
     END;
 
     START TRANSACTION;
@@ -364,6 +379,9 @@ BEGIN
     CALL spLogEtlStep('spInsertPeople', 'MANUAL', 'people', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: SYSTEM USER
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertSystemUser $$
 CREATE PROCEDURE spInsertSystemUser(
     IN personIDParam BIGINT,
@@ -371,13 +389,10 @@ CREATE PROCEDURE spInsertSystemUser(
     IN roleCodeParam VARCHAR(30)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertSystemUser', 'MANUAL', 'systemUser', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertSystemUser', 'MANUAL', 'systemUser', 'ERROR', 0, 0, 'Error al insertar usuario de sistema');
     END;
 
     START TRANSACTION;
@@ -396,6 +411,9 @@ BEGIN
     CALL spLogEtlStep('spInsertSystemUser', 'MANUAL', 'systemUser', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: BRAND TEMPLATE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertBrandTemplate $$
 CREATE PROCEDURE spInsertBrandTemplate(
     IN brandCodeParam VARCHAR(30),
@@ -405,13 +423,10 @@ CREATE PROCEDURE spInsertBrandTemplate(
     IN targetAudienceParam VARCHAR(200)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertBrandTemplate', 'MANUAL', 'brandTemplate', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertBrandTemplate', 'MANUAL', 'brandTemplate', 'ERROR', 0, 0, 'Error al insertar brand template');
     END;
 
     START TRANSACTION;
@@ -435,6 +450,9 @@ BEGIN
     CALL spLogEtlStep('spInsertBrandTemplate', 'MANUAL', 'brandTemplate', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: DYNAMIC SITE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertDynamicSite $$
 CREATE PROCEDURE spInsertDynamicSite(
     IN siteCodeParam VARCHAR(30),
@@ -452,14 +470,11 @@ CREATE PROCEDURE spInsertDynamicSite(
     OUT newDynamicSiteIDParam BIGINT
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
         SET newDynamicSiteIDParam = NULL;
-        CALL spLogEtlStep('spInsertDynamicSite', 'MANUAL', 'dynamicSiteInfo', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertDynamicSite', 'MANUAL', 'dynamicSiteInfo', 'ERROR', 0, 0, 'Error al insertar sitio dinamico');
     END;
 
     START TRANSACTION;
@@ -514,6 +529,9 @@ BEGIN
     CALL spLogEtlStep('spInsertDynamicSite', 'MANUAL', 'dynamicSiteInfo', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: DYNAMIC SITE METRIC
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertDynamicSiteMetric $$
 CREATE PROCEDURE spInsertDynamicSiteMetric(
     IN dynamicSiteIDParam BIGINT,
@@ -522,13 +540,12 @@ CREATE PROCEDURE spInsertDynamicSiteMetric(
     IN metricValueParam DECIMAL(18,6)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
+    DECLARE existingCount INT DEFAULT 0;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertDynamicSiteMetric', 'MANUAL', 'dynamicSiteMetric', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertDynamicSiteMetric', 'MANUAL', 'dynamicSiteMetric', 'ERROR', 0, 0, 'Error al insertar metrica de sitio');
     END;
 
     START TRANSACTION;
@@ -541,26 +558,41 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Rate metrics must be between 0 and 1';
     END IF;
 
-    INSERT INTO dynamicSiteMetric (
-        dynamicSiteID,
-        metricTypeCode,
-        metricDate,
-        metricValue
-    )
-    VALUES (
-        dynamicSiteIDParam,
-        metricTypeCodeParam,
-        metricDateParam,
-        metricValueParam
-    )
-    ON DUPLICATE KEY UPDATE
-        metricValue = metricValueParam,
-        updatedAt = CURRENT_TIMESTAMP;
+    SELECT COUNT(*) INTO existingCount
+    FROM dynamicSiteMetric
+    WHERE dynamicSiteID = dynamicSiteIDParam
+      AND metricTypeCode = metricTypeCodeParam
+      AND metricDate = metricDateParam;
+
+    IF existingCount > 0 THEN
+        UPDATE dynamicSiteMetric
+        SET metricValue = metricValueParam,
+            updatedAt = CURRENT_TIMESTAMP
+        WHERE dynamicSiteID = dynamicSiteIDParam
+          AND metricTypeCode = metricTypeCodeParam
+          AND metricDate = metricDateParam;
+    ELSE
+        INSERT INTO dynamicSiteMetric (
+            dynamicSiteID,
+            metricTypeCode,
+            metricDate,
+            metricValue
+        )
+        VALUES (
+            dynamicSiteIDParam,
+            metricTypeCodeParam,
+            metricDateParam,
+            metricValueParam
+        );
+    END IF;
 
     COMMIT;
     CALL spLogEtlStep('spInsertDynamicSiteMetric', 'MANUAL', 'dynamicSiteMetric', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PRODUCT
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProduct $$
 CREATE PROCEDURE spInsertProduct(
     IN productCodeParam VARCHAR(50),
@@ -575,14 +607,11 @@ CREATE PROCEDURE spInsertProduct(
     OUT newProductIDParam BIGINT
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
         SET newProductIDParam = NULL;
-        CALL spLogEtlStep('spInsertProduct', 'MANUAL', 'product', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertProduct', 'MANUAL', 'product', 'ERROR', 0, 0, 'Error al insertar producto');
     END;
 
     START TRANSACTION;
@@ -620,6 +649,9 @@ BEGIN
     CALL spLogEtlStep('spInsertProduct', 'MANUAL', 'product', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PRODUCT PRICE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductPrice $$
 CREATE PROCEDURE spInsertProductPrice(
     IN productIDParam BIGINT,
@@ -631,13 +663,10 @@ CREATE PROCEDURE spInsertProductPrice(
     IN isCurrentParam BOOLEAN
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertProductPrice', 'MANUAL', 'productPrice', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertProductPrice', 'MANUAL', 'productPrice', 'ERROR', 0, 0, 'Error al insertar precio de producto');
     END;
 
     START TRANSACTION;
@@ -683,6 +712,9 @@ BEGIN
     CALL spLogEtlStep('spInsertProductPrice', 'MANUAL', 'productPrice', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PRODUCT IMAGE
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductImage $$
 CREATE PROCEDURE spInsertProductImage(
     IN productIDParam BIGINT,
@@ -692,13 +724,10 @@ CREATE PROCEDURE spInsertProductImage(
     IN isPrimaryParam BOOLEAN
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertProductImage', 'MANUAL', 'productImage', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertProductImage', 'MANUAL', 'productImage', 'ERROR', 0, 0, 'Error al insertar imagen de producto');
     END;
 
     START TRANSACTION;
@@ -730,6 +759,9 @@ BEGIN
     CALL spLogEtlStep('spInsertProductImage', 'MANUAL', 'productImage', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PRODUCT PACKAGING
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductPackaging $$
 CREATE PROCEDURE spInsertProductPackaging(
     IN productIDParam BIGINT,
@@ -744,13 +776,10 @@ CREATE PROCEDURE spInsertProductPackaging(
     IN isPrimaryParam BOOLEAN
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertProductPackaging', 'MANUAL', 'productPackaging', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertProductPackaging', 'MANUAL', 'productPackaging', 'ERROR', 0, 0, 'Error al insertar empaque de producto');
     END;
 
     START TRANSACTION;
@@ -793,6 +822,9 @@ BEGIN
     CALL spLogEtlStep('spInsertProductPackaging', 'MANUAL', 'productPackaging', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PRODUCT LABEL
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductLabel $$
 CREATE PROCEDURE spInsertProductLabel(
     IN productIDParam BIGINT,
@@ -806,13 +838,10 @@ CREATE PROCEDURE spInsertProductLabel(
     IN isPrimaryParam BOOLEAN
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertProductLabel', 'MANUAL', 'productLabel', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertProductLabel', 'MANUAL', 'productLabel', 'ERROR', 0, 0, 'Error al insertar etiqueta de producto');
     END;
 
     START TRANSACTION;
@@ -855,6 +884,9 @@ BEGIN
     CALL spLogEtlStep('spInsertProductLabel', 'MANUAL', 'productLabel', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: COUNTRY PRODUCT REQUIREMENT
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountryProductRequirement $$
 CREATE PROCEDURE spInsertCountryProductRequirement(
     IN productIDParam BIGINT,
@@ -868,13 +900,10 @@ CREATE PROCEDURE spInsertCountryProductRequirement(
     IN validToParam TIMESTAMP
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCountryProductRequirement', 'MANUAL', 'countryProductRequirement', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCountryProductRequirement', 'MANUAL', 'countryProductRequirement', 'ERROR', 0, 0, 'Error al insertar requerimiento regulatorio');
     END;
 
     START TRANSACTION;
@@ -910,6 +939,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCountryProductRequirement', 'MANUAL', 'countryProductRequirement', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: COUNTRY PRODUCT PERMISSION
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountryProductPermission $$
 CREATE PROCEDURE spInsertCountryProductPermission(
     IN productIDParam BIGINT,
@@ -925,13 +957,10 @@ CREATE PROCEDURE spInsertCountryProductPermission(
     IN notesParam VARCHAR(250)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCountryProductPermission', 'MANUAL', 'countryProductPermission', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCountryProductPermission', 'MANUAL', 'countryProductPermission', 'ERROR', 0, 0, 'Error al insertar permiso de producto');
     END;
 
     START TRANSACTION;
@@ -975,6 +1004,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCountryProductPermission', 'MANUAL', 'countryProductPermission', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION/ACTUALIZACION: INVENTORY
+-- =========================================================
 DROP PROCEDURE IF EXISTS spUpsertInventory $$
 CREATE PROCEDURE spUpsertInventory(
     IN dynamicSiteIDParam BIGINT,
@@ -985,14 +1017,13 @@ CREATE PROCEDURE spUpsertInventory(
     IN sourceCodeParam VARCHAR(30)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
     DECLARE sellableQuantityValue INT;
+    DECLARE existingCount INT DEFAULT 0;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spUpsertInventory', 'MANUAL', 'inventory', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spUpsertInventory', 'MANUAL', 'inventory', 'ERROR', 0, 0, 'Error al insertar/actualizar inventario');
     END;
 
     START TRANSACTION;
@@ -1007,39 +1038,52 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reservedQuantityParam cannot be greater than availableQuantityParam';
     END IF;
 
-    INSERT INTO inventory (
-        dynamicSiteID,
-        productID,
-        availableQuantity,
-        reservedQuantity,
-        sellableQuantity,
-        reorderLevel,
-        sourceCode,
-        lastStockUpdateAt
-    )
-    VALUES (
-        dynamicSiteIDParam,
-        productIDParam,
-        availableQuantityParam,
-        reservedQuantityParam,
-        sellableQuantityValue,
-        reorderLevelParam,
-        sourceCodeParam,
-        CURRENT_TIMESTAMP
-    )
-    ON DUPLICATE KEY UPDATE
-        availableQuantity = availableQuantityParam,
-        reservedQuantity = reservedQuantityParam,
-        sellableQuantity = sellableQuantityValue,
-        reorderLevel = reorderLevelParam,
-        sourceCode = sourceCodeParam,
-        lastStockUpdateAt = CURRENT_TIMESTAMP,
-        updatedAt = CURRENT_TIMESTAMP;
+    SELECT COUNT(*) INTO existingCount
+    FROM inventory
+    WHERE dynamicSiteID = dynamicSiteIDParam
+      AND productID = productIDParam;
+
+    IF existingCount > 0 THEN
+        UPDATE inventory
+        SET availableQuantity = availableQuantityParam,
+            reservedQuantity = reservedQuantityParam,
+            sellableQuantity = sellableQuantityValue,
+            reorderLevel = reorderLevelParam,
+            sourceCode = sourceCodeParam,
+            lastStockUpdateAt = CURRENT_TIMESTAMP,
+            updatedAt = CURRENT_TIMESTAMP
+        WHERE dynamicSiteID = dynamicSiteIDParam
+          AND productID = productIDParam;
+    ELSE
+        INSERT INTO inventory (
+            dynamicSiteID,
+            productID,
+            availableQuantity,
+            reservedQuantity,
+            sellableQuantity,
+            reorderLevel,
+            sourceCode,
+            lastStockUpdateAt
+        )
+        VALUES (
+            dynamicSiteIDParam,
+            productIDParam,
+            availableQuantityParam,
+            reservedQuantityParam,
+            sellableQuantityValue,
+            reorderLevelParam,
+            sourceCodeParam,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
 
     COMMIT;
     CALL spLogEtlStep('spUpsertInventory', 'MANUAL', 'inventory', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: CUSTOMER ORDER
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCustomerOrder $$
 CREATE PROCEDURE spInsertCustomerOrder(
     IN orderCodeParam VARCHAR(50),
@@ -1054,14 +1098,11 @@ CREATE PROCEDURE spInsertCustomerOrder(
     OUT newCustomerOrderIDParam BIGINT
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
         SET newCustomerOrderIDParam = NULL;
-        CALL spLogEtlStep('spInsertCustomerOrder', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCustomerOrder', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, 'Error al insertar orden');
     END;
 
     START TRANSACTION;
@@ -1103,6 +1144,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCustomerOrder', 'MANUAL', 'customerOrder', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: CUSTOMER ORDER DETAIL
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCustomerOrderDetail $$
 CREATE PROCEDURE spInsertCustomerOrderDetail(
     IN customerOrderIDParam BIGINT,
@@ -1113,14 +1157,12 @@ CREATE PROCEDURE spInsertCustomerOrderDetail(
     IN discountAmountParam DECIMAL(18,6)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
     DECLARE lineTotalValue DECIMAL(18,6);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertCustomerOrderDetail', 'MANUAL', 'customerOrderDetail', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertCustomerOrderDetail', 'MANUAL', 'customerOrderDetail', 'ERROR', 0, 0, 'Error al insertar detalle de orden');
     END;
 
     START TRANSACTION;
@@ -1162,6 +1204,9 @@ BEGIN
     CALL spLogEtlStep('spInsertCustomerOrderDetail', 'MANUAL', 'customerOrderDetail', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE ACTUALIZACION: CUSTOMER ORDER STATUS
+-- =========================================================
 DROP PROCEDURE IF EXISTS spUpdateCustomerOrderStatus $$
 CREATE PROCEDURE spUpdateCustomerOrderStatus(
     IN customerOrderIDParam BIGINT,
@@ -1170,14 +1215,12 @@ CREATE PROCEDURE spUpdateCustomerOrderStatus(
     IN changeDetailsParam VARCHAR(250)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
     DECLARE previousOrderStatusCodeValue VARCHAR(30);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spUpdateCustomerOrderStatus', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spUpdateCustomerOrderStatus', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, 'Error al actualizar estado de orden');
     END;
 
     START TRANSACTION;
@@ -1185,8 +1228,7 @@ BEGIN
     SELECT orderStatusCode
     INTO previousOrderStatusCodeValue
     FROM customerOrder
-    WHERE customerOrderID = customerOrderIDParam
-    FOR UPDATE;
+    WHERE customerOrderID = customerOrderIDParam;
 
     UPDATE customerOrder
     SET orderStatusCode = orderStatusCodeParam,
@@ -1218,6 +1260,9 @@ BEGIN
     CALL spLogEtlStep('spUpdateCustomerOrderStatus', 'MANUAL', 'customerOrder', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: PAYMENT TRANSACTION
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertPaymentTransaction $$
 CREATE PROCEDURE spInsertPaymentTransaction(
     IN customerOrderIDParam BIGINT,
@@ -1231,14 +1276,12 @@ CREATE PROCEDURE spInsertPaymentTransaction(
     IN providerReferenceParam VARCHAR(80)
 )
 BEGIN
-    DECLARE errorMessage TEXT;
     DECLARE checksumValue VARCHAR(80);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertPaymentTransaction', 'MANUAL', 'paymentTransaction', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertPaymentTransaction', 'MANUAL', 'paymentTransaction', 'ERROR', 0, 0, 'Error al insertar transaccion de pago');
     END;
 
     START TRANSACTION;
@@ -1296,6 +1339,9 @@ BEGIN
     CALL spLogEtlStep('spInsertPaymentTransaction', 'MANUAL', 'paymentTransaction', 'SUCCESS', 1, 1, NULL);
 END $$
 
+-- =========================================================
+-- SP DE INSERCION: SHIPMENT
+-- =========================================================
 DROP PROCEDURE IF EXISTS spInsertShipment $$
 CREATE PROCEDURE spInsertShipment(
     IN customerOrderIDParam BIGINT,
@@ -1309,13 +1355,10 @@ CREATE PROCEDURE spInsertShipment(
     IN deliveredAtParam TIMESTAMP
 )
 BEGIN
-    DECLARE errorMessage TEXT;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        GET DIAGNOSTICS CONDITION 1 errorMessage = MESSAGE_TEXT;
         ROLLBACK;
-        CALL spLogEtlStep('spInsertShipment', 'MANUAL', 'shipment', 'ERROR', 0, 0, errorMessage);
+        CALL spLogEtlStep('spInsertShipment', 'MANUAL', 'shipment', 'ERROR', 0, 0, 'Error al insertar envio');
     END;
 
     START TRANSACTION;
@@ -1349,128 +1392,6 @@ BEGIN
 
     COMMIT;
     CALL spLogEtlStep('spInsertShipment', 'MANUAL', 'shipment', 'SUCCESS', 1, 1, NULL);
-END $$
-
-DROP PROCEDURE IF EXISTS spSeedSampleData $$
-CREATE PROCEDURE spSeedSampleData()
-BEGIN
-    DECLARE crcCurrencyID BIGINT;
-    DECLARE usdCurrencyID BIGINT;
-    DECLARE costaRicaCountryID BIGINT;
-    DECLARE adminPersonID BIGINT;
-    DECLARE customerPersonID BIGINT;
-    DECLARE dynamicSiteIDValue BIGINT;
-    DECLARE productIDValue BIGINT;
-    DECLARE customerOrderIDValue BIGINT;
-
-    CALL spInsertCurrency('USD', 'US Dollar', '$');
-    CALL spInsertCurrency('CRC', 'Costa Rican Colon', '₡');
-
-    SELECT currencyID INTO usdCurrencyID FROM currency WHERE currencyCode = 'USD' LIMIT 1;
-    SELECT currencyID INTO crcCurrencyID FROM currency WHERE currencyCode = 'CRC' LIMIT 1;
-
-    CALL spInsertCountry('Costa Rica', 'CR', 'CRI', crcCurrencyID);
-    SELECT countryID INTO costaRicaCountryID FROM country WHERE iso2Code = 'CR' LIMIT 1;
-
-    CALL spInsertBrandTemplate('PUREAURA', 'PureAura', 'https://example.com/logo.png', 'Natural wellness for daily life', 'Premium wellness customers');
-
-    CALL spInsertPeople('PERS-ADMIN-001', costaRicaCountryID, 'admin@dynamicbrands.com', 'Admin', 'User', 'hash_admin', 'SYSTEM_USER', adminPersonID);
-    CALL spInsertSystemUser(adminPersonID, 'USR-ADMIN-001', 'ADMIN');
-
-    CALL spInsertPeople('PERS-CUST-001', costaRicaCountryID, 'customer@example.com', 'Laura', 'Ramirez', 'hash_customer', 'CUSTOMER', customerPersonID);
-
-    CALL spInsertDynamicSite(
-        'SITE-CR-001',
-        'PureAura Costa Rica',
-        'PUREAURA',
-        costaRicaCountryID,
-        crcCurrencyID,
-        'ACTIVE',
-        'pureaura.cr',
-        'Natural health',
-        'Warm, premium, trustworthy',
-        JSON_OBJECT('primaryColor', '#2E7D32', 'style', 'natural'),
-        'Dynamic Brands',
-        'https://example.com/site-logo.png',
-        dynamicSiteIDValue
-    );
-
-    CALL spInsertDynamicSiteMetric(dynamicSiteIDValue, 'VISITS', CURRENT_DATE, 1000);
-    CALL spInsertDynamicSiteMetric(dynamicSiteIDValue, 'SESSIONS', CURRENT_DATE, 800);
-    CALL spInsertDynamicSiteMetric(dynamicSiteIDValue, 'PURCHASES', CURRENT_DATE, 40);
-    CALL spInsertDynamicSiteMetric(dynamicSiteIDValue, 'CONVERSION_RATE', CURRENT_DATE, 0.05);
-
-    CALL spInsertProduct(
-        'PROD-OIL-001',
-        dynamicSiteIDValue,
-        'OIL',
-        'Aceite Esencial Premium',
-        'Aceite esencial premium para aromaterapia',
-        'SKU-OIL-001',
-        usdCurrencyID,
-        15.000000,
-        adminPersonID,
-        productIDValue
-    );
-
-    CALL spInsertProductPrice(productIDValue, dynamicSiteIDValue, crcCurrencyID, 14500.000000, CURRENT_TIMESTAMP, NULL, TRUE);
-    CALL spInsertProductImage(productIDValue, 'MAIN', 'https://example.com/product-main.png', 1, TRUE);
-    CALL spUpsertInventory(dynamicSiteIDValue, productIDValue, 120, 10, 20, 'HUB');
-
-    CALL spInsertCountryProductPermission(
-        productIDValue,
-        costaRicaCountryID,
-        50000,
-        'PERM-CR-001',
-        'Registro sanitario producto natural',
-        'APPROVED',
-        'CERT-001',
-        'Ministerio de Salud',
-        CURRENT_TIMESTAMP,
-        DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 YEAR),
-        'Permiso inicial aprobado'
-    );
-
-    CALL spInsertCustomerOrder(
-        'ORD-001',
-        customerPersonID,
-        dynamicSiteIDValue,
-        costaRicaCountryID,
-        crcCurrencyID,
-        'CREATED',
-        2500.000000,
-        1.000000,
-        'Orden de prueba',
-        customerOrderIDValue
-    );
-
-    CALL spInsertCustomerOrderDetail(customerOrderIDValue, productIDValue, 2, 14500.000000, 3770.000000, 0.000000);
-
-    CALL spInsertPaymentTransaction(
-        customerOrderIDValue,
-        'PAY-001',
-        'VISA',
-        'APPROVED',
-        35270.000000,
-        crcCurrencyID,
-        1.000000,
-        NULL,
-        'VISA-REF-001'
-    );
-
-    CALL spUpdateCustomerOrderStatus(customerOrderIDValue, 'PAID', adminPersonID, 'Payment approved');
-
-    CALL spInsertShipment(
-        customerOrderIDValue,
-        'SHIP-001',
-        'PENDING',
-        'San José, Costa Rica',
-        NULL,
-        'Correos CR',
-        'CUSTOMER',
-        NULL,
-        NULL
-    );
 END $$
 
 DELIMITER ;

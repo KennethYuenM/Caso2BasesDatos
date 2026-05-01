@@ -3,7 +3,7 @@ USE dynamicBrandsDB;
 DELIMITER $$
 
 -- =========================================================
--- CUSTOMER ORDER
+-- CUSTOMER ORDER: validaciones basicas
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertCustomerOrder $$
 CREATE TRIGGER trgBeforeInsertCustomerOrder
@@ -45,91 +45,12 @@ BEGIN
     SET NEW.totalAmount = ROUND(NEW.subTotal + NEW.taxTotal + NEW.shippingAmount, 6);
 END $$
 
-DROP TRIGGER IF EXISTS trgAfterInsertCustomerOrder $$
-CREATE TRIGGER trgAfterInsertCustomerOrder
-AFTER INSERT ON customerOrder
-FOR EACH ROW
-BEGIN
-    INSERT INTO customerOrderStatusLog (
-        customerOrderID,
-        previousOrderStatusCode,
-        currentOrderStatusCode,
-        changeDetails,
-        changeSourceCode,
-        changedByPersonID,
-        changedAt,
-        createdAt
-    )
-    VALUES (
-        NEW.customerOrderID,
-        NULL,
-        NEW.orderStatusCode,
-        CONCAT('Initial order status set to ', NEW.orderStatusCode),
-        COALESCE(@changeSourceCode, 'SYSTEM'),
-        @currentPersonID,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    );
-END $$
-
-DROP TRIGGER IF EXISTS trgAfterUpdateCustomerOrderStatus $$
-CREATE TRIGGER trgAfterUpdateCustomerOrderStatus
-AFTER UPDATE ON customerOrder
-FOR EACH ROW
-BEGIN
-    IF OLD.orderStatusCode <> NEW.orderStatusCode THEN
-        INSERT INTO customerOrderStatusLog (
-            customerOrderID,
-            previousOrderStatusCode,
-            currentOrderStatusCode,
-            changeDetails,
-            changeSourceCode,
-            changedByPersonID,
-            changedAt,
-            createdAt
-        )
-        VALUES (
-            NEW.customerOrderID,
-            OLD.orderStatusCode,
-            NEW.orderStatusCode,
-            COALESCE(@changeDetails, CONCAT('Order status changed from ', OLD.orderStatusCode, ' to ', NEW.orderStatusCode)),
-            COALESCE(@changeSourceCode, 'SYSTEM'),
-            @currentPersonID,
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
-        );
-    END IF;
-END $$
-
 -- =========================================================
--- CUSTOMER ORDER DETAIL
+-- CUSTOMER ORDER DETAIL: validaciones y recalculo de totales
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertCustomerOrderDetail $$
 CREATE TRIGGER trgBeforeInsertCustomerOrderDetail
 BEFORE INSERT ON customerOrderDetail
-FOR EACH ROW
-BEGIN
-    IF NEW.quantity <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'quantity must be greater than zero';
-    END IF;
-    IF NEW.unitPrice < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'unitPrice cannot be negative';
-    END IF;
-    IF NEW.taxAmount < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'taxAmount cannot be negative';
-    END IF;
-    IF NEW.discountAmount < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'discountAmount cannot be negative';
-    END IF;
-    SET NEW.lineTotal = ROUND((NEW.quantity * NEW.unitPrice) + NEW.taxAmount - NEW.discountAmount, 6);
-    IF NEW.lineTotal < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'lineTotal cannot be negative';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeUpdateCustomerOrderDetail $$
-CREATE TRIGGER trgBeforeUpdateCustomerOrderDetail
-BEFORE UPDATE ON customerOrderDetail
 FOR EACH ROW
 BEGIN
     IF NEW.quantity <= 0 THEN
@@ -170,41 +91,6 @@ BEGIN
     WHERE customerOrderID = NEW.customerOrderID;
 END $$
 
-DROP TRIGGER IF EXISTS trgAfterUpdateCustomerOrderDetail $$
-CREATE TRIGGER trgAfterUpdateCustomerOrderDetail
-AFTER UPDATE ON customerOrderDetail
-FOR EACH ROW
-BEGIN
-    UPDATE customerOrder
-    SET subTotal = (
-            SELECT IFNULL(SUM(quantity * unitPrice), 0)
-            FROM customerOrderDetail
-            WHERE customerOrderID = NEW.customerOrderID
-        ),
-        taxTotal = (
-            SELECT IFNULL(SUM(taxAmount), 0)
-            FROM customerOrderDetail
-            WHERE customerOrderID = NEW.customerOrderID
-        ),
-        updatedAt = CURRENT_TIMESTAMP
-    WHERE customerOrderID = NEW.customerOrderID;
-    IF OLD.customerOrderID <> NEW.customerOrderID THEN
-        UPDATE customerOrder
-        SET subTotal = (
-                SELECT IFNULL(SUM(quantity * unitPrice), 0)
-                FROM customerOrderDetail
-                WHERE customerOrderID = OLD.customerOrderID
-            ),
-            taxTotal = (
-                SELECT IFNULL(SUM(taxAmount), 0)
-                FROM customerOrderDetail
-                WHERE customerOrderID = OLD.customerOrderID
-            ),
-            updatedAt = CURRENT_TIMESTAMP
-        WHERE customerOrderID = OLD.customerOrderID;
-    END IF;
-END $$
-
 DROP TRIGGER IF EXISTS trgAfterDeleteCustomerOrderDetail $$
 CREATE TRIGGER trgAfterDeleteCustomerOrderDetail
 AFTER DELETE ON customerOrderDetail
@@ -226,7 +112,7 @@ BEGIN
 END $$
 
 -- =========================================================
--- INVENTORY
+-- INVENTORY: calculo automatico de sellableQuantity
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertInventory $$
 CREATE TRIGGER trgBeforeInsertInventory
@@ -271,7 +157,7 @@ BEGIN
 END $$
 
 -- =========================================================
--- PAYMENT TRANSACTION
+-- PAYMENT TRANSACTION: checksum automatico
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertPaymentTransaction $$
 CREATE TRIGGER trgBeforeInsertPaymentTransaction
@@ -301,36 +187,8 @@ BEGIN
     ), 256);
 END $$
 
-DROP TRIGGER IF EXISTS trgBeforeUpdatePaymentTransaction $$
-CREATE TRIGGER trgBeforeUpdatePaymentTransaction
-BEFORE UPDATE ON paymentTransaction
-FOR EACH ROW
-BEGIN
-    IF NEW.transactionAmount < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'transactionAmount cannot be negative';
-    END IF;
-    IF NEW.exchangeRate <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exchangeRate must be greater than zero';
-    END IF;
-    SET NEW.checksum = SHA2(CONCAT(
-        NEW.transactionCode,
-        '|',
-        NEW.customerOrderID,
-        '|',
-        NEW.methodCode,
-        '|',
-        NEW.paymentStatusCode,
-        '|',
-        NEW.transactionAmount,
-        '|',
-        NEW.currencyID,
-        '|',
-        NEW.exchangeRate
-    ), 256);
-END $$
-
 -- =========================================================
--- DYNAMIC SITE LOGS
+-- DYNAMIC SITE: audit log al crear un sitio
 -- =========================================================
 DROP TRIGGER IF EXISTS trgAfterInsertDynamicSiteInfo $$
 CREATE TRIGGER trgAfterInsertDynamicSiteInfo
@@ -349,12 +207,15 @@ BEGIN
         NEW.dynamicSiteID,
         'SITE_CREATED',
         CONCAT('Dynamic site created with siteCode ', NEW.siteCode),
-        @currentPersonID,
+        NULL,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
     );
 END $$
 
+-- =========================================================
+-- DYNAMIC SITE: log de cambios de estado
+-- =========================================================
 DROP TRIGGER IF EXISTS trgAfterUpdateDynamicSiteInfo $$
 CREATE TRIGGER trgAfterUpdateDynamicSiteInfo
 AFTER UPDATE ON dynamicSiteInfo
@@ -375,12 +236,13 @@ BEGIN
             NEW.dynamicSiteID,
             OLD.siteStatusCode,
             NEW.siteStatusCode,
-            COALESCE(@changeDetails, CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode)),
-            COALESCE(@changeSourceCode, 'SYSTEM'),
-            @currentPersonID,
+            CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode),
+            'SYSTEM',
+            NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+
         INSERT INTO dynamicSiteAuditLog (
             dynamicSiteID,
             eventTypeCode,
@@ -392,37 +254,8 @@ BEGIN
         VALUES (
             NEW.dynamicSiteID,
             'SITE_STATUS_CHANGED',
-            COALESCE(@changeDetails, CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode)),
-            @currentPersonID,
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
-        );
-    ELSEIF OLD.siteName <> NEW.siteName
-        OR OLD.brandCode <> NEW.brandCode
-        OR OLD.countryID <> NEW.countryID
-        OR OLD.currencyID <> NEW.currencyID
-        OR OLD.primaryDomainName <> NEW.primaryDomainName
-        OR IFNULL(OLD.marketingFocus, '') <> IFNULL(NEW.marketingFocus, '')
-        OR IFNULL(OLD.brandVoice, '') <> IFNULL(NEW.brandVoice, '')
-        OR IFNULL(CAST(OLD.siteVisualsConfig AS CHAR), '') <> IFNULL(CAST(NEW.siteVisualsConfig AS CHAR), '')
-        OR IFNULL(CAST(OLD.launchDate AS CHAR), '') <> IFNULL(CAST(NEW.launchDate AS CHAR), '')
-        OR IFNULL(CAST(OLD.closeDate AS CHAR), '') <> IFNULL(CAST(NEW.closeDate AS CHAR), '')
-        OR IFNULL(OLD.clientName, '') <> IFNULL(NEW.clientName, '')
-        OR IFNULL(OLD.logoURL, '') <> IFNULL(NEW.logoURL, '')
-        OR OLD.isActive <> NEW.isActive THEN
-        INSERT INTO dynamicSiteAuditLog (
-            dynamicSiteID,
-            eventTypeCode,
-            eventDetails,
-            performedByPersonID,
-            performedAt,
-            createdAt
-        )
-        VALUES (
-            NEW.dynamicSiteID,
-            'SITE_UPDATED',
-            CONCAT('Dynamic site updated with siteCode ', NEW.siteCode),
-            @currentPersonID,
+            CONCAT('Site status changed from ', OLD.siteStatusCode, ' to ', NEW.siteStatusCode),
+            NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
@@ -430,7 +263,7 @@ BEGIN
 END $$
 
 -- =========================================================
--- PRODUCT BASIC VALIDATIONS
+-- PRODUCT: validacion de precio base
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertProduct $$
 CREATE TRIGGER trgBeforeInsertProduct
@@ -442,19 +275,8 @@ BEGIN
     END IF;
 END $$
 
-DROP TRIGGER IF EXISTS trgBeforeUpdateProduct $$
-CREATE TRIGGER trgBeforeUpdateProduct
-BEFORE UPDATE ON product
-FOR EACH ROW
-BEGIN
-    IF NEW.basePrice < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'basePrice cannot be negative';
-    END IF;
-END $$
-
 -- =========================================================
--- PRODUCT PRICE AND PRODUCT IMAGE VALIDATIONS
--- IMPORTANT: isCurrent/isPrimary changes should be handled by stored procedures.
+-- PRODUCT PRICE: validacion de fechas y monto
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertProductPrice $$
 CREATE TRIGGER trgBeforeInsertProductPrice
@@ -469,119 +291,8 @@ BEGIN
     END IF;
 END $$
 
-DROP TRIGGER IF EXISTS trgBeforeUpdateProductPrice $$
-CREATE TRIGGER trgBeforeUpdateProductPrice
-BEFORE UPDATE ON productPrice
-FOR EACH ROW
-BEGIN
-    IF NEW.priceAmount < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'priceAmount cannot be negative';
-    END IF;
-    IF NEW.validTo IS NOT NULL AND NEW.validTo < NEW.validFrom THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'validTo cannot be earlier than validFrom';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeInsertProductImage $$
-CREATE TRIGGER trgBeforeInsertProductImage
-BEFORE INSERT ON productImage
-FOR EACH ROW
-BEGIN
-    IF NEW.displayOrder <= 0 THEN
-        SET NEW.displayOrder = 1;
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeUpdateProductImage $$
-CREATE TRIGGER trgBeforeUpdateProductImage
-BEFORE UPDATE ON productImage
-FOR EACH ROW
-BEGIN
-    IF NEW.displayOrder <= 0 THEN
-        SET NEW.displayOrder = 1;
-    END IF;
-END $$
-
 -- =========================================================
--- REQUIREMENTS AND PERMISSIONS
--- =========================================================
-DROP TRIGGER IF EXISTS trgBeforeInsertCountryProductRequirement $$
-CREATE TRIGGER trgBeforeInsertCountryProductRequirement
-BEFORE INSERT ON countryProductRequirement
-FOR EACH ROW
-BEGIN
-    IF NEW.validTo IS NOT NULL AND NEW.validFrom IS NOT NULL AND NEW.validTo < NEW.validFrom THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'validTo cannot be earlier than validFrom';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeUpdateCountryProductRequirement $$
-CREATE TRIGGER trgBeforeUpdateCountryProductRequirement
-BEFORE UPDATE ON countryProductRequirement
-FOR EACH ROW
-BEGIN
-    IF NEW.validTo IS NOT NULL AND NEW.validFrom IS NOT NULL AND NEW.validTo < NEW.validFrom THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'validTo cannot be earlier than validFrom';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeInsertCountryProductPermission $$
-CREATE TRIGGER trgBeforeInsertCountryProductPermission
-BEFORE INSERT ON countryProductPermission
-FOR EACH ROW
-BEGIN
-    IF NEW.permissionCost < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCost cannot be negative';
-    END IF;
-    IF NEW.expiresAt IS NOT NULL AND NEW.issuedAt IS NOT NULL AND NEW.expiresAt < NEW.issuedAt THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAt cannot be earlier than issuedAt';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeUpdateCountryProductPermission $$
-CREATE TRIGGER trgBeforeUpdateCountryProductPermission
-BEFORE UPDATE ON countryProductPermission
-FOR EACH ROW
-BEGIN
-    IF NEW.permissionCost < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCost cannot be negative';
-    END IF;
-    IF NEW.expiresAt IS NOT NULL AND NEW.issuedAt IS NOT NULL AND NEW.expiresAt < NEW.issuedAt THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAt cannot be earlier than issuedAt';
-    END IF;
-END $$
-
--- =========================================================
--- METRICS
--- =========================================================
-DROP TRIGGER IF EXISTS trgBeforeInsertDynamicSiteMetric $$
-CREATE TRIGGER trgBeforeInsertDynamicSiteMetric
-BEFORE INSERT ON dynamicSiteMetric
-FOR EACH ROW
-BEGIN
-    IF NEW.metricValue < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'metricValue cannot be negative';
-    END IF;
-    IF NEW.metricTypeCode IN ('CONVERSION_RATE', 'BOUNCE_RATE') AND NEW.metricValue > 1 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rate metrics must be between 0 and 1';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgBeforeUpdateDynamicSiteMetric $$
-CREATE TRIGGER trgBeforeUpdateDynamicSiteMetric
-BEFORE UPDATE ON dynamicSiteMetric
-FOR EACH ROW
-BEGIN
-    IF NEW.metricValue < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'metricValue cannot be negative';
-    END IF;
-    IF NEW.metricTypeCode IN ('CONVERSION_RATE', 'BOUNCE_RATE') AND NEW.metricValue > 1 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rate metrics must be between 0 and 1';
-    END IF;
-END $$
-
--- =========================================================
--- EXCHANGE RATES
+-- EXCHANGE RATES: validaciones basicas
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertCurrentExchangeRate $$
 CREATE TRIGGER trgBeforeInsertCurrentExchangeRate
@@ -596,73 +307,24 @@ BEGIN
     END IF;
 END $$
 
-DROP TRIGGER IF EXISTS trgBeforeUpdateCurrentExchangeRate $$
-CREATE TRIGGER trgBeforeUpdateCurrentExchangeRate
-BEFORE UPDATE ON currentExchangeRate
+-- =========================================================
+-- METRICS: validacion de valores
+-- =========================================================
+DROP TRIGGER IF EXISTS trgBeforeInsertDynamicSiteMetric $$
+CREATE TRIGGER trgBeforeInsertDynamicSiteMetric
+BEFORE INSERT ON dynamicSiteMetric
 FOR EACH ROW
 BEGIN
-    IF NEW.baseCurrencyID = NEW.quoteCurrencyID THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'baseCurrencyID and quoteCurrencyID cannot be equal';
+    IF NEW.metricValue < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'metricValue cannot be negative';
     END IF;
-    IF NEW.buyRate <= 0 OR NEW.sellRate <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exchange rates must be greater than zero';
-    END IF;
-END $$
-
-DROP TRIGGER IF EXISTS trgAfterInsertCurrentExchangeRate $$
-CREATE TRIGGER trgAfterInsertCurrentExchangeRate
-AFTER INSERT ON currentExchangeRate
-FOR EACH ROW
-BEGIN
-    INSERT INTO historicalExchangeRate (
-        exchangePairID,
-        buyRate,
-        sellRate,
-        validFrom,
-        validTo,
-        recordedAt
-    )
-    VALUES (
-        NEW.exchangePairID,
-        NEW.buyRate,
-        NEW.sellRate,
-        CURRENT_TIMESTAMP,
-        NULL,
-        CURRENT_TIMESTAMP
-    );
-END $$
-
-DROP TRIGGER IF EXISTS trgAfterUpdateCurrentExchangeRate $$
-CREATE TRIGGER trgAfterUpdateCurrentExchangeRate
-AFTER UPDATE ON currentExchangeRate
-FOR EACH ROW
-BEGIN
-    IF OLD.buyRate <> NEW.buyRate OR OLD.sellRate <> NEW.sellRate THEN
-        UPDATE historicalExchangeRate
-        SET validTo = CURRENT_TIMESTAMP
-        WHERE exchangePairID = OLD.exchangePairID
-          AND validTo IS NULL;
-        INSERT INTO historicalExchangeRate (
-            exchangePairID,
-            buyRate,
-            sellRate,
-            validFrom,
-            validTo,
-            recordedAt
-        )
-        VALUES (
-            NEW.exchangePairID,
-            NEW.buyRate,
-            NEW.sellRate,
-            CURRENT_TIMESTAMP,
-            NULL,
-            CURRENT_TIMESTAMP
-        );
+    IF NEW.metricTypeCode IN ('CONVERSION_RATE', 'BOUNCE_RATE') AND NEW.metricValue > 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rate metrics must be between 0 and 1';
     END IF;
 END $$
 
 -- =========================================================
--- SHIPMENT
+-- SHIPMENT: validacion de fechas
 -- =========================================================
 DROP TRIGGER IF EXISTS trgBeforeInsertShipment $$
 CREATE TRIGGER trgBeforeInsertShipment
@@ -674,13 +336,19 @@ BEGIN
     END IF;
 END $$
 
-DROP TRIGGER IF EXISTS trgBeforeUpdateShipment $$
-CREATE TRIGGER trgBeforeUpdateShipment
-BEFORE UPDATE ON shipment
+-- =========================================================
+-- PERMISSIONS: validacion de costos y fechas
+-- =========================================================
+DROP TRIGGER IF EXISTS trgBeforeInsertCountryProductPermission $$
+CREATE TRIGGER trgBeforeInsertCountryProductPermission
+BEFORE INSERT ON countryProductPermission
 FOR EACH ROW
 BEGIN
-    IF NEW.deliveredAt IS NOT NULL AND NEW.shippedAt IS NOT NULL AND NEW.deliveredAt < NEW.shippedAt THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'deliveredAt cannot be earlier than shippedAt';
+    IF NEW.permissionCost < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCost cannot be negative';
+    END IF;
+    IF NEW.expiresAt IS NOT NULL AND NEW.issuedAt IS NOT NULL AND NEW.expiresAt < NEW.issuedAt THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAt cannot be earlier than issuedAt';
     END IF;
 END $$
 
