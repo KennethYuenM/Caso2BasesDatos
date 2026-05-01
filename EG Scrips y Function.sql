@@ -746,6 +746,7 @@ begin
             raise;
     end;
 end;
+$$;
 
 /*Inventarios*/
 create or replace function fn_actualizar_inventario()

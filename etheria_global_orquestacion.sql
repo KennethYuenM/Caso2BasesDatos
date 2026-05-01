@@ -11,4 +11,5 @@ commit;
 4. Crear funciones
 5. Ejecutar sp_cargar_tablas
 6. Crear triggers
+7. Ejecutar call sp_orquestar_carga_etheria_global();
 */
