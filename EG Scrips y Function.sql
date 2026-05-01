@@ -1,1059 +1,625 @@
-/*Se necesita ejecutar primero el siguiente incert antes de los scripts, por eso lo pongo aca*/
-insert into acciones (nombreaccion)
-values 
-('CREATE'),
-('UPDATE'),
-('DELETE'),
-('ERROR')
-on conflict do nothing;
+/*==============================================================*/
+/* FUNCIONES BASE                                               */
+/*==============================================================*/
 
-
-/*Funciones base de log y checksum*/
-
-create or replace function fn_generar_checksum(p_data jsonb)
-returns text
-language plpgsql
-as $$
-begin
-    return encode(digest(p_data::text, 'sha256'), 'hex');
-exception
-    when others then
-        raise;
-end;
+CREATE OR REPLACE FUNCTION fn_generar_checksum(p_data jsonb)
+RETURNS text
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN encode(digest(p_data::text, 'sha256'), 'hex');
+END;
 $$;
 
-create or replace function fn_insert_log(
+CREATE OR REPLACE FUNCTION fn_insert_log(
     p_usuario int,
     p_tabla text,
     p_accion text,
     p_objeto_id int,
-    p_datos_viejos jsonb default null,
-    p_datos_nuevos jsonb default null,
-    p_error text default null
+    p_datos_viejos jsonb DEFAULT null,
+    p_datos_nuevos jsonb DEFAULT null,
+    p_error text DEFAULT null
 )
-returns void
-language plpgsql
-as $$
-declare
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_tablaid int;
     v_accionid int;
     v_checksum text;
-begin
-    begin
-        select t.tablaid, a.accionid
-        into v_tablaid, v_accionid
-        from tablassistema t
-        join acciones a
-          on upper(a.nombreaccion) = upper(p_accion)
-        where lower(t.nombretabla) = lower(p_tabla)
-        limit 1;
+BEGIN
+    SELECT tablaid INTO v_tablaid
+    FROM tablassistema
+    WHERE lower(nombretabla) = lower(p_tabla)
+    LIMIT 1;
 
-        if v_tablaid is null or v_accionid is null then
-            return; -- evita romper operación por fallo de log
-        end if;
+    SELECT accionid INTO v_accionid
+    FROM acciones
+    WHERE upper(nombreaccion) = upper(p_accion)
+    LIMIT 1;
 
-        v_checksum := fn_generar_checksum(
-            jsonb_build_object(
-                'usuario', coalesce(p_usuario, 0),
-                'tabla', p_tabla,
-                'accion', p_accion,
-                'objeto_id', coalesce(p_objeto_id, 0),
-                'viejo', coalesce(p_datos_viejos, '{}'::jsonb),
-                'nuevo', coalesce(p_datos_nuevos, '{}'::jsonb),
-                'error', coalesce(p_error, '')
-            )
-        );
+    IF v_tablaid IS NULL THEN
+        INSERT INTO tablassistema(nombretabla)
+        VALUES (lower(p_tabla))
+        ON CONFLICT(nombretabla) DO NOTHING;
 
-        insert into logs (
-            usuariomodificacion,
-            tablaid,
-            accionid,
-            objetoafectadoid,
-            datosviejos,
-            datosnuevos,
-            error,
-            checksum
+        SELECT tablaid INTO v_tablaid
+        FROM tablassistema
+        WHERE lower(nombretabla) = lower(p_tabla)
+        LIMIT 1;
+    END IF;
+
+    IF v_accionid IS NULL THEN
+        RETURN;
+    END IF;
+
+    v_checksum := fn_generar_checksum(
+        jsonb_build_object(
+            'usuario', coalesce(p_usuario, 0),
+            'tabla', p_tabla,
+            'accion', p_accion,
+            'objeto_id', coalesce(p_objeto_id, 0),
+            'viejo', coalesce(p_datos_viejos, '{}'::jsonb),
+            'nuevo', coalesce(p_datos_nuevos, '{}'::jsonb),
+            'error', coalesce(p_error, '')
         )
-        values (
-            p_usuario,
-            v_tablaid,
-            v_accionid,
-            coalesce(p_objeto_id, 0),
-            p_datos_viejos,
-            p_datos_nuevos,
-            p_error,
-            v_checksum
-        );
+    );
 
-    exception
-        when others then
-            -- nunca romper por log
-            null;
-    end;
-end;
+    INSERT INTO logs(
+        usuariomodificacion,
+        tablaid,
+        accionid,
+        objetoafectadoid,
+        datosviejos,
+        datosnuevos,
+        error,
+        checksum
+    )
+    VALUES(
+        p_usuario,
+        v_tablaid,
+        v_accionid,
+        coalesce(p_objeto_id, 0),
+        p_datos_viejos,
+        p_datos_nuevos,
+        p_error,
+        v_checksum
+    );
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
 $$;
 
-create or replace function fn_trigger_log()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_trigger_log()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_usuario int;
     v_objeto_id int := 0;
     v_accion text;
     v_old jsonb;
     v_new jsonb;
-begin
-    begin
-        if tg_op = 'INSERT' then
-            v_accion := 'CREATE';
-            v_new := to_jsonb(new);
-        elsif tg_op = 'UPDATE' then
-            v_accion := 'UPDATE';
-            v_new := to_jsonb(new);
-            v_old := to_jsonb(old);
-        else
-            v_accion := 'DELETE';
-            v_old := to_jsonb(old);
-        end if;
+BEGIN
+    IF tg_op = 'INSERT' THEN
+        v_accion := 'CREATE';
+        v_new := to_jsonb(new);
+    ELSIF tg_op = 'UPDATE' THEN
+        v_accion := 'UPDATE';
+        v_new := to_jsonb(new);
+        v_old := to_jsonb(old);
+    ELSE
+        v_accion := 'DELETE';
+        v_old := to_jsonb(old);
+    END IF;
 
-        begin
-            v_usuario := (coalesce(v_new, v_old)->>'usuariomodificacion')::int;
-        exception when others then
-            v_usuario := null;
-        end;
+    BEGIN
+        v_usuario := (coalesce(v_new, v_old)->>'usuariomodificacion')::int;
+    EXCEPTION WHEN OTHERS THEN
+        v_usuario := null;
+    END;
 
-        if tg_nargs >= 1 then
-            if tg_op = 'DELETE' then
+    IF tg_nargs >= 1 THEN
+        BEGIN
+            IF tg_op = 'DELETE' THEN
                 v_objeto_id := coalesce((to_jsonb(old)->>tg_argv[0])::int, 0);
-            else
+            ELSE
                 v_objeto_id := coalesce((to_jsonb(new)->>tg_argv[0])::int, 0);
-            end if;
-        end if;
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            v_objeto_id := 0;
+        END;
+    END IF;
 
-        perform fn_insert_log(
-            v_usuario,
-            tg_table_name,
-            v_accion,
-            v_objeto_id,
-            v_old,
-            v_new,
-            null
-        );
+    PERFORM fn_insert_log(v_usuario, tg_table_name, v_accion, v_objeto_id, v_old, v_new, null);
 
-        return case when tg_op = 'DELETE' then old else new end;
-
-    exception
-        when others then
-            perform fn_insert_log(
-                v_usuario,
-                tg_table_name,
-                v_accion,
-                coalesce(v_objeto_id, 0),
-                v_old,
-                v_new,
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    RETURN CASE WHEN tg_op = 'DELETE' THEN old ELSE new END;
+END;
 $$;
 
-/*Checksum automático*/
-
-create or replace function fn_set_checksum()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_set_checksum()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_data jsonb;
     i int;
+BEGIN
+    v_data := to_jsonb(new) - 'checksum';
+
+    IF tg_nargs > 0 THEN
+        FOR i IN 0 .. tg_nargs - 1 LOOP
+            v_data := v_data - lower(tg_argv[i]);
+        END LOOP;
+    END IF;
+
+    new.checksum := fn_generar_checksum(v_data);
+    RETURN new;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION fn_update_last_login()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_usuario int;
-begin
-    begin
-        v_data := to_jsonb(new) - 'checksum';
+BEGIN
+    BEGIN
+        v_usuario := (to_jsonb(new)->>'usuariomodificacion')::int;
+    EXCEPTION WHEN OTHERS THEN
+        v_usuario := null;
+    END;
 
-        if tg_nargs > 0 then
-            for i in 0 .. tg_nargs - 1 loop
-                v_data := v_data - tg_argv[i];
-            end loop;
-        end if;
+    IF v_usuario IS NOT NULL THEN
+        UPDATE usuarios
+        SET ultimologin = current_timestamp
+        WHERE usuarioid = v_usuario;
+    END IF;
 
-        new.checksum := fn_generar_checksum(v_data);
-        return new;
-
-    exception
-        when others then
-            v_usuario := (to_jsonb(new)->>'usuariomodificacion')::int;
-
-            perform fn_insert_log(
-                v_usuario,
-                tg_table_name,
-                tg_op,
-                0,
-                null,
-                to_jsonb(new),
-                sqlerrm
-            );
-
-            raise;
-    end;
-end;
+    RETURN CASE WHEN tg_op = 'DELETE' THEN old ELSE new END;
+END;
 $$;
 
-/*Ultimo Login automático*/
-
-create or replace function fn_update_last_login()
-returns trigger
-language plpgsql
-as $$
-declare
-    v_usuario int;
-begin
-    begin
-        v_usuario := coalesce(
-            (to_jsonb(new)->>'usuariomodificacion')::int,
-            (to_jsonb(old)->>'usuariomodificacion')::int
-        );
-
-        if v_usuario is not null then
-            update usuarios
-            set ultimologin = current_timestamp
-            where usuarioid = v_usuario;
-        end if;
-
-        return case when tg_op = 'DELETE' then old else new end;
-
-    exception
-        when others then
-            perform fn_insert_log(
-                v_usuario,
-                tg_table_name,
-                tg_op,
-                0,
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+CREATE OR REPLACE PROCEDURE sp_cargar_tablas()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO tablassistema(nombretabla)
+    SELECT lower(table_name)
+    FROM information_schema.tables
+    WHERE table_schema = 'core'
+      AND table_type = 'BASE TABLE'
+    ON CONFLICT(nombretabla) DO NOTHING;
+END;
 $$;
 
-/*Tablas Del sistema*/
-create or replace procedure sp_cargar_tablas()
-language plpgsql
-as $$
-begin
-    begin
-        insert into tablassistema (nombretabla)
-        select table_name
-        from information_schema.tables
-        where table_schema = 'core'
-          and table_type = 'BASE TABLE'
-        on conflict (nombretabla) do nothing;
-    exception
-        when others then
-            perform fn_insert_log(null, 'tablassistema', 'CREATE', 0, null, null, sqlerrm);
-            raise;
-    end;
-end;
-$$;
-
-/*Validaciones y trigger de direcciones*/
-
-create or replace function fn_validar_division()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_validar_division()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_orden_division int;
     v_orden_max int;
-begin
-    begin
-        select
-            ng.orden,
-            max(ng2.orden)
-        into v_orden_division, v_orden_max
-        from divisionesgeograficas dg
-        join nivelesgeograficos ng
-            on ng.nivelid = dg.nivelid
-        join divisionesgeograficas dgp
-            on dgp.paisid = dg.paisid
-        join nivelesgeograficos ng2
-            on ng2.nivelid = dgp.nivelid
-        where dg.divisionid = new.divisionid
-        group by ng.orden;
+BEGIN
+    SELECT ng.orden
+    INTO v_orden_division
+    FROM divisionesgeograficas dg
+    JOIN nivelesgeograficos ng ON ng.nivelid = dg.nivelid
+    WHERE dg.divisionid = new.divisionid;
 
-        if v_orden_division is null then
-            raise exception 'La division % no existe', new.divisionid;
-        end if;
+    SELECT max(ng.orden)
+    INTO v_orden_max
+    FROM divisionesgeograficas dg
+    JOIN nivelesgeograficos ng ON ng.nivelid = dg.nivelid
+    WHERE dg.paisid = (
+        SELECT paisid FROM divisionesgeograficas WHERE divisionid = new.divisionid
+    );
 
-        if v_orden_division <> v_orden_max then
-            raise exception 'La division % no es el nivel más bajo del país', new.divisionid;
-        end if;
+    IF v_orden_division IS NULL THEN
+        RAISE EXCEPTION 'La division % no existe', new.divisionid;
+    END IF;
 
-        return new;
+    IF v_orden_division <> v_orden_max THEN
+        RAISE EXCEPTION 'La division % no es el nivel más bajo del país', new.divisionid;
+    END IF;
 
-    exception
-        when others then
-            perform fn_insert_log(
-                (to_jsonb(new)->>'usuariomodificacion')::int,
-                'direcciones',
-                tg_op,
-                0,
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    RETURN new;
+END;
 $$;
 
-create or replace function fn_generar_direccion()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_generar_direccion()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_ruta text;
-begin
-    begin
-        with recursive ruta as (
-            select dg.divisionid, dg.padreid, dg.nombre, ng.orden
-            from divisionesgeograficas dg
-            join nivelesgeograficos ng on ng.nivelid = dg.nivelid
-            where dg.divisionid = new.divisionid
+BEGIN
+    WITH RECURSIVE ruta AS (
+        SELECT dg.divisionid, dg.padreid, dg.nombre, ng.orden
+        FROM divisionesgeograficas dg
+        JOIN nivelesgeograficos ng ON ng.nivelid = dg.nivelid
+        WHERE dg.divisionid = new.divisionid
+        UNION ALL
+        SELECT p.divisionid, p.padreid, p.nombre, ng.orden
+        FROM divisionesgeograficas p
+        JOIN nivelesgeograficos ng ON ng.nivelid = p.nivelid
+        JOIN ruta r ON r.padreid = p.divisionid
+    )
+    SELECT string_agg(nombre, ', ' ORDER BY orden)
+    INTO v_ruta
+    FROM ruta;
 
-            union all
-
-            select p.divisionid, p.padreid, p.nombre, ng.orden
-            from divisionesgeograficas p
-            join nivelesgeograficos ng on ng.nivelid = p.nivelid
-            join ruta r on r.padreid = p.divisionid
-        )
-        select string_agg(nombre, ', ' order by orden)
-        into v_ruta
-        from ruta;
-
-        new.direccioncompleta :=
-            concat_ws(', ', new.calle, new.numero, new.referencia, v_ruta);
-
-        return new;
-
-    exception
-        when others then
-            perform fn_insert_log(
-                (to_jsonb(new)->>'usuariomodificacion')::int,
-                'direcciones',
-                tg_op,
-                0,
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    new.direccioncompleta := concat_ws(', ', new.calle, new.numero, new.referencia, v_ruta);
+    RETURN new;
+END;
 $$;
 
-/*Historial Cambio de monedas*/
+CREATE OR REPLACE FUNCTION fn_historial_tipo_cambio()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE historialcambiosmonedas
+    SET fechafin = current_timestamp
+    WHERE tipocambioid = old.tipocambioid
+      AND fechafin = '9999-12-31 23:59:59'::timestamp;
 
-create or replace function fn_historial_tipo_cambio()
-returns trigger
-language plpgsql
-as $$
-begin
-    begin
-        update historialcambiosmonedas
-        set fechafin = current_timestamp
-        where tipocambioid = old.tipocambioid
-          and fechafin = '9999-12-31 23:59:59'::timestamp;
+    INSERT INTO historialcambiosmonedas(
+        moneda1id,
+        moneda2id,
+        tipocambioid,
+        usuariomodificacion,
+        fechainicio,
+        fechafin,
+        tipocambio,
+        checksum,
+        horacambio
+    )
+    VALUES(
+        new.moneda1id,
+        new.moneda2id,
+        new.tipocambioid,
+        new.usuariomodificacion,
+        current_timestamp,
+        '9999-12-31 23:59:59'::timestamp,
+        new.tipocambio,
+        fn_generar_checksum(jsonb_build_object('moneda1id', new.moneda1id, 'moneda2id', new.moneda2id, 'tipocambioid', new.tipocambioid, 'tipocambio', new.tipocambio)),
+        current_timestamp
+    );
 
-        insert into historialcambiosmonedas (
-            moneda1id,
-            moneda2id,
-            tipocambioid,
-            usuariomodificacion,
-            fechainicio,
-            fechafin,
-            tipocambio,
-            checksum,
-            horacambio
-        )
-        values (
-            new.moneda1id,
-            new.moneda2id,
-            new.tipocambioid,
-            new.usuariomodificacion,
-            current_timestamp,
-            '9999-12-31 23:59:59'::timestamp,
-            new.tipocambio,
-            fn_generar_checksum(
-                jsonb_build_object(
-                    'moneda1id', new.moneda1id,
-                    'moneda2id', new.moneda2id,
-                    'tipocambioid', new.tipocambioid,
-                    'tipocambio', new.tipocambio
-                )
-            ),
-            current_timestamp
-        );
-
-        return new;
-    exception
-        when others then
-            perform fn_insert_log(
-                coalesce(new.usuariomodificacion, old.usuariomodificacion),
-                'tiposcambio',
-                'UPDATE',
-                coalesce(new.tipocambioid, old.tipocambioid),
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    RETURN new;
+END;
 $$;
 
-/*Ordenes, balance, lote y recálculo de costos*/
+CREATE OR REPLACE FUNCTION fn_actualizar_balance()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF new.estado = 'completado'
+       AND (tg_op = 'INSERT' OR old.estado IS DISTINCT FROM new.estado) THEN
+        UPDATE balanceneto
+        SET saldo = coalesce(saldo, 0) + coalesce(new.monto, 0),
+            ultimaactualizacion = current_timestamp
+        WHERE balanceid = 1;
 
-create or replace procedure sp_crear_orden(
-    in p_usuario int,
-    in p_estado int,
-    in p_tipo int,
-    in p_direccion_envio int,
-    in p_direccion_entrega int,
-    in p_moneda int,
-    in p_tipocambioid int,
-    in p_tipocambio numeric(18,6),
-    in p_numero_orden varchar(30),
-    out p_orden_id int
-)
-language plpgsql
-as $$
-begin
-    begin
-        insert into ordenes (
-            estadoid,
-            tipoordenid,
-            usuariomodificacion,
-            direccionenvioid,
-            direccionentregaid,
-            monedaid,
-            tipocambioid,
-            tipocambio,
-            numeroorden,
-            preciofinal
-        )
-        values (
-            p_estado,
-            p_tipo,
-            p_usuario,
-            p_direccion_envio,
-            p_direccion_entrega,
-            p_moneda,
-            p_tipocambioid,
-            p_tipocambio,
-            p_numero_orden,
-            0
-        )
-        returning ordenid into p_orden_id;
+        IF NOT FOUND THEN
+            INSERT INTO balanceneto(balanceid, saldo, ultimaactualizacion)
+            VALUES (1, coalesce(new.monto, 0), current_timestamp)
+            ON CONFLICT(balanceid) DO UPDATE
+            SET saldo = balanceneto.saldo + excluded.saldo,
+                ultimaactualizacion = current_timestamp;
+        END IF;
+    END IF;
 
-        insert into estadoscuenta (
-            ordenid,
-            usuariomodificacion,
-            tipomovimiento,
-            estado,
-            monedaid,
-            tipocambioid,
-            tipocambio,
-            monto
-        )
-        values (
-            p_orden_id,
-            p_usuario,
-            'Debito',
-            'pendiente',
-            p_moneda,
-            p_tipocambioid,
-            p_tipocambio,
-            0
-        );
-
-        insert into transacciones (
-            monedaid,
-            usuariomodificacion,
-            tipoid,
-            estadotransaccionid,
-            ordenid,
-            tipocambioid,
-            tipocambio,
-            monto,
-            descripcion
-        )
-        values (
-            p_moneda,
-            p_usuario,
-            1,
-            1,
-            p_orden_id,
-            p_tipocambioid,
-            p_tipocambio,
-            0,
-            'Transacción generada automáticamente al crear la orden'
-        );
-    exception
-        when others then
-            perform fn_insert_log(
-                p_usuario,
-                'ordenes',
-                'CREATE',
-                coalesce(p_orden_id, 0),
-                null,
-                null,
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    RETURN new;
+END;
 $$;
 
-create or replace function fn_actualizar_balance()
-returns trigger
-language plpgsql
-as $$
-begin
-    begin
-        if new.estado = 'completado'
-           and (tg_op = 'INSERT' or old.estado is distinct from new.estado) then
-
-            update balanceneto
-            set saldo = coalesce(saldo, 0) + coalesce(new.monto, 0),
-                ultimaActualizacion = current_timestamp
-            where balanceid = 1;
-
-            if not found then
-                insert into balanceneto (saldo, ultimaActualizacion)
-                values (coalesce(new.monto, 0), current_timestamp);
-            end if;
-        end if;
-
-        return new;
-    exception
-        when others then
-            perform fn_insert_log(
-                coalesce(new.usuariomodificacion, old.usuariomodificacion),
-                'estadoscuenta',
-                'UPDATE',
-                coalesce(new.estadocuentaid, old.estadocuentaid),
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
-$$;
-
-create or replace function fn_asignar_lote()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_asignar_lote()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_loteid int;
-begin
-    begin
-        select loteid
-        into v_loteid
-        from lotes
-        where productoid = new.productoid
-          and cantidadproductolotedisponible >= new.cantidad
-        order by fechafabricacion asc, loteid asc
-        limit 1
-        for update skip locked;
+BEGIN
+    IF new.loteid IS NOT NULL THEN
+        RETURN new;
+    END IF;
 
-        if v_loteid is null then
-            raise exception 'No hay lotes suficientes para el producto % (cantidad solicitada: %)', 
-                new.productoid, new.cantidad;
-        end if;
+    SELECT loteid
+    INTO v_loteid
+    FROM lotes
+    WHERE productoid = new.productoid
+      AND cantidadproductolotedisponible >= new.cantidad
+    ORDER BY fechafabricacion ASC, loteid ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED;
 
-        new.loteid := v_loteid;
+    IF v_loteid IS NULL THEN
+        RAISE EXCEPTION 'No hay lotes suficientes para el producto %', new.productoid;
+    END IF;
 
-        return new;
-
-    exception
-        when others then
-            perform fn_insert_log(
-                (to_jsonb(new)->>'usuariomodificacion')::int,
-                'ordendetalles',
-                'CREATE',
-                0,
-                null,
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    new.loteid := v_loteid;
+    RETURN new;
+END;
 $$;
 
-create or replace function fn_recalcular_orden()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_recalcular_orden()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_ordenid int;
-begin
-    begin
-        if tg_table_name = 'ordendetalles' then
-            v_ordenid := coalesce(new.ordenid, old.ordenid);
-        elsif tg_table_name in ('ordendetalleimpuestos', 'ordendetallepermisos', 'ordendetalledescuentos') then
-            select od.ordenid
-            into v_ordenid
-            from ordendetalles od
-            where od.ordendetalleid = coalesce(new.ordendetalleid, old.ordendetalleid);
-        end if;
+BEGIN
+    IF tg_table_name = 'ordendetalles' THEN
+        v_ordenid := coalesce(new.ordenid, old.ordenid);
+    ELSE
+        SELECT od.ordenid
+        INTO v_ordenid
+        FROM ordendetalles od
+        WHERE od.ordendetalleid = coalesce(new.ordendetalleid, old.ordendetalleid);
+    END IF;
 
-        update ordenes o
-        set preciofinal = coalesce((
-            select sum(coalesce(od.preciolotefinal, 0))
-            from ordendetalles od
-            where od.ordenid = v_ordenid
+    IF v_ordenid IS NOT NULL THEN
+        UPDATE ordenes o
+        SET preciofinal = coalesce((
+            SELECT sum(coalesce(od.preciolotefinal, 0))
+            FROM ordendetalles od
+            WHERE od.ordenid = v_ordenid
         ), 0)
-        where o.ordenid = v_ordenid;
+        WHERE o.ordenid = v_ordenid;
+    END IF;
 
-        return case when tg_op = 'DELETE' then old else new end;
-    exception
-        when others then
-            perform fn_insert_log(
-                coalesce((to_jsonb(new)->>'usuariomodificacion')::int, (to_jsonb(old)->>'usuariomodificacion')::int),
-                tg_table_name,
-                case when tg_op = 'INSERT' then 'CREATE' when tg_op = 'UPDATE' then 'UPDATE' else 'DELETE' end,
-                coalesce(v_ordenid, 0),
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    RETURN CASE WHEN tg_op = 'DELETE' THEN old ELSE new END;
+END;
 $$;
 
-create or replace function fn_calcular_totales_detalle(p_ordendetalleid int)
-returns void
-language plpgsql
-as $$
-declare
-    v_producto_id int;
+CREATE OR REPLACE FUNCTION fn_calcular_totales_detalle(p_ordendetalleid int)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_cantidad int;
     v_precio_unitario numeric(18,6);
-
+    v_costo_envio numeric(18,6);
     v_precio_base numeric(18,6) := 0;
     v_impuestos numeric(18,6) := 0;
     v_permisos numeric(18,6) := 0;
     v_descuentos numeric(18,6) := 0;
-begin
-    begin
-        /* Obtener datos base */
-        select od.productoid, od.cantidad, p.precio
-        into v_producto_id, v_cantidad, v_precio_unitario
-        from ordendetalles od
-        join productos p on p.productoid = od.productoid
-        where od.ordendetalleid = p_ordendetalleid;
+BEGIN
+    SELECT od.cantidad, p.precio, coalesce(od.costoenvio, 0)
+    INTO v_cantidad, v_precio_unitario, v_costo_envio
+    FROM ordendetalles od
+    JOIN productos p ON p.productoid = od.productoid
+    WHERE od.ordendetalleid = p_ordendetalleid;
 
-        if v_producto_id is null then
-            raise exception 'Detalle % no existe', p_ordendetalleid;
-        end if;
+    IF v_cantidad IS NULL THEN
+        RETURN;
+    END IF;
 
-        /* Precio base */
-        v_precio_base := coalesce(v_precio_unitario,0) * coalesce(v_cantidad,0);
+    v_precio_base := coalesce(v_precio_unitario, 0) * coalesce(v_cantidad, 0);
 
-        /* Impuestos */
-        select coalesce(sum(
-            case 
-                when ip.tipo = 'porcentaje' then (v_precio_base * ip.valor / 100)
-                else ip.valor
-            end
-        ),0)
-        into v_impuestos
-        from ordendetalleimpuestos odi
-        join impuestospais ip on ip.impuestoid = odi.impuestoid
-        where odi.ordendetalleid = p_ordendetalleid;
+    SELECT coalesce(sum(
+        CASE
+            WHEN ip.tipo = 'porcentaje' THEN (v_precio_base * ip.valor / 100)
+            ELSE ip.valor
+        END
+    ), 0)
+    INTO v_impuestos
+    FROM ordendetalleimpuestos odi
+    JOIN impuestospais ip ON ip.impuestoid = odi.impuestoid
+    WHERE odi.ordendetalleid = p_ordendetalleid;
 
-        /* Permisos */
-        select coalesce(sum(pi.costo),0)
-        into v_permisos
-        from ordendetallepermisos odp
-        join permisosimportacion pi on pi.permisoid = odp.permisoid
-        where odp.ordendetalleid = p_ordendetalleid;
+    SELECT coalesce(sum(pi.costo / nullif(pi.tipocambio, 0)), 0)
+    INTO v_permisos
+    FROM ordendetallepermisos odp
+    JOIN permisosimportacion pi ON pi.permisoid = odp.permisoid
+    WHERE odp.ordendetalleid = p_ordendetalleid;
 
-        /* Descuentos */
-        select coalesce(sum(monto),0)
-        into v_descuentos
-        from ordendetalledescuentos
-        where ordendetalleid = p_ordendetalleid;
+    SELECT coalesce(sum(monto), 0)
+    INTO v_descuentos
+    FROM ordendetalledescuentos
+    WHERE ordendetalleid = p_ordendetalleid;
 
-        /* Update final */
-        update ordendetalles
-        set 
-            descuentofinal = v_descuentos,
-            preciolotefinal = (v_precio_base + v_impuestos + v_permisos) - v_descuentos
-        where ordendetalleid = p_ordendetalleid;
-
-    exception
-        when others then
-            perform fn_insert_log(
-                null,
-                'ordendetalles',
-                'UPDATE',
-                p_ordendetalleid,
-                null,
-                null,
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    UPDATE ordendetalles
+    SET descuentofinal = v_descuentos,
+        preciolotefinal = greatest((v_precio_base + v_impuestos + v_permisos + v_costo_envio) - v_descuentos, 0)
+    WHERE ordendetalleid = p_ordendetalleid;
+END;
 $$;
 
-create or replace function fn_trigger_recalculo_detalle()
-returns trigger
-language plpgsql
-as $$
-declare
+CREATE OR REPLACE FUNCTION fn_trigger_recalculo_detalle()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
     v_id int;
-begin
-    begin
-        v_id := coalesce(new.ordendetalleid, old.ordendetalleid);
+BEGIN
 
-        perform fn_calcular_totales_detalle(v_id);
+    -- evita recursión infinita
+    IF pg_trigger_depth() > 1 THEN
+        RETURN CASE
+            WHEN tg_op = 'DELETE' THEN old
+            ELSE new
+        END;
+    END IF;
 
-        return case when tg_op = 'DELETE' then old else new end;
+    v_id := coalesce(new.ordendetalleid, old.ordendetalleid);
 
-    exception
-        when others then
-            perform fn_insert_log(
-                null,
-                tg_table_name,
-                tg_op,
-                coalesce(v_id,0),
-                to_jsonb(old),
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    IF tg_op <> 'DELETE' AND v_id IS NOT NULL THEN
+        PERFORM fn_calcular_totales_detalle(v_id);
+    END IF;
+
+    RETURN CASE
+        WHEN tg_op = 'DELETE' THEN old
+        ELSE new
+    END;
+END;
 $$;
 
-/*Inventarios*/
-create or replace function fn_actualizar_inventario()
-returns trigger
-language plpgsql
-as $$
-declare
-    v_tipo int;
-    v_stock numeric;
-    v_usuario int;
-begin
-    begin
-        /* Obtener usuario */
-        v_usuario := coalesce(
-            new.usuariomodificacion,
-            old.usuariomodificacion
-        );
+CREATE OR REPLACE FUNCTION fn_actualizar_inventario()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_tipo_nombre text;
+    v_stock int;
+BEGIN
 
-        /* Obtener tipo de orden */
-        select tipoordenid
-        into v_tipo
-        from ordenes
-        where ordenid = new.ordenid;
+    SELECT nombre
+    INTO v_tipo_nombre
+    FROM tiposorden
+    WHERE tipoordenid = (
+        SELECT tipoordenid
+        FROM ordenes
+        WHERE ordenid = new.ordenid
+    );
 
-        if v_tipo is null then
-            raise exception 'No existe la orden %', new.ordenid;
-        end if;
+    SELECT cantidadproductolotedisponible
+    INTO v_stock
+    FROM lotes
+    WHERE loteid = new.loteid
+    FOR UPDATE;
 
-        /* Obtener stock actual del lote */
-        select cantidadproductolotedisponible
-        into v_stock
-        from lotes
-        where loteid = new.loteid
-        for update;
+    IF v_stock IS NULL THEN
+        RAISE EXCEPTION 'No existe el lote %', new.loteid;
+    END IF;
 
-        if v_stock is null then
-            raise exception 'No existe el lote %', new.loteid;
-        end if;
+    IF lower(v_tipo_nombre) IN ('venta', 'salida') THEN
 
-        if v_tipo = 1 then
-            /* SALIDA (venta) */
-            if v_stock < new.cantidad then
-                raise exception 
-                'Stock insuficiente en lote % (disponible: %, requerido: %)',
-                new.loteid, v_stock, new.cantidad;
-            end if;
+        IF v_stock < new.cantidad THEN
+            RAISE EXCEPTION 'Stock insuficiente en lote %', new.loteid;
+        END IF;
 
-            update lotes
-            set cantidadproductolotedisponible = v_stock - new.cantidad
-            where loteid = new.loteid;
+        UPDATE lotes
+        SET cantidadproductolotedisponible =
+            cantidadproductolotedisponible - new.cantidad
+        WHERE loteid = new.loteid;
 
-        else
-            /* ENTRADA (compra) */
-            update lotes
-            set cantidadproductolotedisponible = v_stock + new.cantidad
-            where loteid = new.loteid;
-        end if;
+    ELSE
 
-        return new;
+        UPDATE lotes
+        SET cantidadproductolotedisponible =
+            LEAST(
+                cantidadproductoloteinicial,
+                cantidadproductolotedisponible + 0
+            )
+        WHERE loteid = new.loteid;
 
-    exception
-        when others then
-            perform fn_insert_log(
-                v_usuario,
-                'lotes',
-                'UPDATE',
-                coalesce(new.loteid, 0),
-                null,
-                to_jsonb(new),
-                sqlerrm
-            );
-            raise;
-    end;
-end;
+    END IF;
+
+    UPDATE inventarios
+    SET cantidaddisponible = (
+            SELECT cantidadproductolotedisponible
+            FROM lotes
+            WHERE loteid = new.loteid
+        ),
+        ultimaactualizacion = current_timestamp
+    WHERE loteid = new.loteid;
+
+    RETURN new;
+
+END;
 $$;
 
-/*Creación de triggers*/
+/*==============================================================*/
+/* TRIGGERS                                                     */
+/*==============================================================*/
 
-drop trigger if exists trg_direcciones_validar_division on direcciones;
-create trigger trg_direcciones_validar_division
-before insert or update on direcciones
-for each row
-execute function fn_validar_division();
+DROP TRIGGER IF EXISTS trg_direcciones_validar_division ON direcciones;
+CREATE TRIGGER trg_direcciones_validar_division
+BEFORE INSERT OR UPDATE ON direcciones
+FOR EACH ROW EXECUTE FUNCTION fn_validar_division();
 
-drop trigger if exists trg_direcciones_generar_completa on direcciones;
-create trigger trg_direcciones_generar_completa
-before insert or update on direcciones
-for each row
-execute function fn_generar_direccion();
+DROP TRIGGER IF EXISTS trg_direcciones_generar_completa ON direcciones;
+CREATE TRIGGER trg_direcciones_generar_completa
+BEFORE INSERT OR UPDATE ON direcciones
+FOR EACH ROW EXECUTE FUNCTION fn_generar_direccion();
 
-drop trigger if exists trg_tiposcambio_historial on tiposcambio;
-create trigger trg_tiposcambio_historial
-after update on tiposcambio
-for each row
-execute function fn_historial_tipo_cambio();
+DROP TRIGGER IF EXISTS trg_tiposcambio_historial ON tiposcambio;
+CREATE TRIGGER trg_tiposcambio_historial
+AFTER UPDATE ON tiposcambio
+FOR EACH ROW EXECUTE FUNCTION fn_historial_tipo_cambio();
 
-drop trigger if exists trg_estadoscuenta_balance on estadoscuenta;
-create trigger trg_estadoscuenta_balance
-after insert or update of estado on estadoscuenta
-for each row
-execute function fn_actualizar_balance();
+DROP TRIGGER IF EXISTS trg_estadoscuenta_balance ON estadoscuenta;
+CREATE TRIGGER trg_estadoscuenta_balance
+AFTER INSERT OR UPDATE OF estado ON estadoscuenta
+FOR EACH ROW EXECUTE FUNCTION fn_actualizar_balance();
 
-drop trigger if exists trg_ordendetalles_asignar_lote on ordendetalles;
-create trigger trg_ordendetalles_asignar_lote
-before insert on ordendetalles
-for each row
-execute function fn_asignar_lote();
+DROP TRIGGER IF EXISTS trg_ordendetalles_asignar_lote ON ordendetalles;
+CREATE TRIGGER trg_ordendetalles_asignar_lote
+BEFORE INSERT ON ordendetalles
+FOR EACH ROW EXECUTE FUNCTION fn_asignar_lote();
 
-drop trigger if exists trg_recalcular_orden_detalles on ordendetalles;
-create trigger trg_recalcular_orden_detalles
-after insert or update or delete on ordendetalles
-for each row
-execute function fn_recalcular_orden();
+DROP TRIGGER IF EXISTS trg_recalcular_orden_detalles ON ordendetalles;
+CREATE TRIGGER trg_recalcular_orden_detalles
+AFTER INSERT OR UPDATE OR DELETE ON ordendetalles
+FOR EACH ROW EXECUTE FUNCTION fn_recalcular_orden();
 
-drop trigger if exists trg_recalcular_orden_impuestos on ordendetalleimpuestos;
-create trigger trg_recalcular_orden_impuestos
-after insert or update or delete on ordendetalleimpuestos
-for each row
-execute function fn_recalcular_orden();
+DROP TRIGGER IF EXISTS trg_recalcular_orden_impuestos ON ordendetalleimpuestos;
+CREATE TRIGGER trg_recalcular_orden_impuestos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetalleimpuestos
+FOR EACH ROW EXECUTE FUNCTION fn_recalcular_orden();
 
-drop trigger if exists trg_recalcular_orden_permisos on ordendetallepermisos;
-create trigger trg_recalcular_orden_permisos
-after insert or update or delete on ordendetallepermisos
-for each row
-execute function fn_recalcular_orden();
+DROP TRIGGER IF EXISTS trg_recalcular_orden_permisos ON ordendetallepermisos;
+CREATE TRIGGER trg_recalcular_orden_permisos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetallepermisos
+FOR EACH ROW EXECUTE FUNCTION fn_recalcular_orden();
 
-drop trigger if exists trg_recalcular_orden_descuentos on ordendetalledescuentos;
-create trigger trg_recalcular_orden_descuentos
-after insert or update or delete on ordendetalledescuentos
-for each row
-execute function fn_recalcular_orden();
+DROP TRIGGER IF EXISTS trg_recalcular_orden_descuentos ON ordendetalledescuentos;
+CREATE TRIGGER trg_recalcular_orden_descuentos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetalledescuentos
+FOR EACH ROW EXECUTE FUNCTION fn_recalcular_orden();
 
-create trigger trg_inventario_movimiento
-after insert on ordendetalles
-for each row
-execute function fn_actualizar_inventario();
+DROP TRIGGER IF EXISTS trg_inventario_movimiento ON ordendetalles;
+CREATE TRIGGER trg_inventario_movimiento
+AFTER INSERT ON ordendetalles
+FOR EACH ROW EXECUTE FUNCTION fn_actualizar_inventario();
 
-/*Creacion de los trigger de los checksums*/
+DROP TRIGGER IF EXISTS trg_checksum_tiposcambio ON tiposcambio;
+CREATE TRIGGER trg_checksum_tiposcambio
+BEFORE INSERT OR UPDATE ON tiposcambio
+FOR EACH ROW EXECUTE FUNCTION fn_set_checksum('tiempocreacion', 'ultimaactualizacion', 'activo');
 
-drop trigger if exists trg_checksum_tiposcambio on tiposcambio;
-create trigger trg_checksum_tiposcambio
-before insert or update on tiposcambio
-for each row
-execute function fn_set_checksum('tiempo_creacion', 'ultima_actualizacion', 'activo');
+DROP TRIGGER IF EXISTS trg_checksum_historialcambiosmonedas ON historialcambiosmonedas;
+CREATE TRIGGER trg_checksum_historialcambiosmonedas
+BEFORE INSERT OR UPDATE ON historialcambiosmonedas
+FOR EACH ROW EXECUTE FUNCTION fn_set_checksum('fechainicio', 'fechafin', 'horacambio');
 
-drop trigger if exists trg_checksum_historialcambiosmonedas on historialcambiosmonedas;
-create trigger trg_checksum_historialcambiosmonedas
-before insert or update on historialcambiosmonedas
-for each row
-execute function fn_set_checksum('fechainicio', 'fechafin', 'horacambio');
+DROP TRIGGER IF EXISTS trg_checksum_ordendetalles ON ordendetalles;
+CREATE TRIGGER trg_checksum_ordendetalles
+BEFORE INSERT OR UPDATE ON ordendetalles
+FOR EACH ROW EXECUTE FUNCTION fn_set_checksum('descuentofinal', 'preciolotefinal');
 
-drop trigger if exists trg_checksum_ordendetalles on ordendetalles;
-create trigger trg_checksum_ordendetalles
-before insert or update on ordendetalles
-for each row
-execute function fn_set_checksum('descuentofinal', 'preciolotefinal');
+DROP TRIGGER IF EXISTS trg_checksum_transacciones ON transacciones;
+CREATE TRIGGER trg_checksum_transacciones
+BEFORE INSERT OR UPDATE ON transacciones
+FOR EACH ROW EXECUTE FUNCTION fn_set_checksum('fecha');
 
-drop trigger if exists trg_checksum_transacciones on transacciones;
-create trigger trg_checksum_transacciones
-before insert or update on transacciones
-for each row
-execute function fn_set_checksum('fecha');
+DROP TRIGGER IF EXISTS trg_checksum_estadoscuenta ON estadoscuenta;
+CREATE TRIGGER trg_checksum_estadoscuenta
+BEFORE INSERT OR UPDATE ON estadoscuenta
+FOR EACH ROW EXECUTE FUNCTION fn_set_checksum('fecharegistro');
 
-drop trigger if exists trg_checksum_estadoscuenta on estadoscuenta;
-create trigger trg_checksum_estadoscuenta
-before insert or update on estadoscuenta
-for each row
-execute function fn_set_checksum('fecharegistro', 'estado');
+DROP TRIGGER IF EXISTS trg_calc_detalle ON ordendetalles;
+CREATE TRIGGER trg_calc_detalle
+AFTER INSERT OR UPDATE ON ordendetalles
+FOR EACH ROW EXECUTE FUNCTION fn_trigger_recalculo_detalle();
 
+DROP TRIGGER IF EXISTS trg_calc_impuestos ON ordendetalleimpuestos;
+CREATE TRIGGER trg_calc_impuestos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetalleimpuestos
+FOR EACH ROW EXECUTE FUNCTION fn_trigger_recalculo_detalle();
 
+DROP TRIGGER IF EXISTS trg_calc_permisos ON ordendetallepermisos;
+CREATE TRIGGER trg_calc_permisos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetallepermisos
+FOR EACH ROW EXECUTE FUNCTION fn_trigger_recalculo_detalle();
 
--- detalle
-create trigger trg_calc_detalle
-after insert or update on ordendetalles
-for each row
-execute function fn_trigger_recalculo_detalle();
-
--- impuestos
-create trigger trg_calc_impuestos
-after insert or update or delete on ordendetalleimpuestos
-for each row
-execute function fn_trigger_recalculo_detalle();
-
--- permisos
-create trigger trg_calc_permisos
-after insert or update or delete on ordendetallepermisos
-for each row
-execute function fn_trigger_recalculo_detalle();
-
--- descuentos
-create trigger trg_calc_descuentos
-after insert or update or delete on ordendetalledescuentos
-for each row
-execute function fn_trigger_recalculo_detalle();
-
-/*Creacion de los trigger de los logs*/
-
-do $$
-declare
-    r record;
-begin
-    begin
-        for r in
-            select *
-            from (values
-                ('rolesxusuario', null),
-                ('permisosxrole', null),
-
-                ('divisionesgeograficas', 'divisionid'),
-                ('direcciones', 'direccionid'),
-
-                ('contactos', 'contactoid'),
-                ('telefonoscontactos', 'telefonocontactoid'),
-                ('correoscontactos', 'correocontactoid'),
-
-                ('centroslogisticos', 'centrologisticoid'),
-                ('proveedores', 'proveedorid'),
-                ('contactosproveedor', null),
-
-                ('productos', 'productoid'),
-                ('valorcaracteristicas', null),
-
-                ('monedas', 'monedaid'),
-                ('tiposcambio', 'tipocambioid'),
-                ('historialcambiosmonedas', 'historialcambioid'),
-
-                ('permisosimportacion', 'permisoid'),
-
-                ('lotes', 'loteid'),
-                ('movimientosinventario', 'movimientoid'),
-                ('inventarios', 'inventarioid'),
-
-                ('historialpreciosproducto', 'historialprecioid'),
-
-                ('ordenes', 'ordenid'),
-                ('ordendetalles', 'ordendetalleid'),
-                ('ordendetalleimpuestos', null),
-                ('ordendetallepermisos', null),
-                ('ordendetalledescuentos', 'ordendetalledescuentoid'),
-
-                ('trazabilidadorden', 'trazabilidadid'),
-                ('impuestospais', 'impuestoid'),
-
-                ('transacciones', 'transaccionid'),
-
-                ('estadoscuenta', 'estadocuentaid'),
-                ('balanceneto', 'balanceid')
-            ) as t(table_name, pk_col)
-        loop
-            execute format(
-                'drop trigger if exists %I on %I;',
-                'trg_audit_' || r.table_name,
-                r.table_name
-            );
-
-            if r.pk_col is null then
-                execute format(
-                    'create trigger %I 
-                     after insert or update or delete on %I 
-                     for each row 
-                     execute function fn_trigger_log();',
-                    'trg_audit_' || r.table_name,
-                    r.table_name
-                );
-            else
-                execute format(
-                    'create trigger %I 
-                     after insert or update or delete on %I 
-                     for each row 
-                     execute function fn_trigger_log(%L);',
-                    'trg_audit_' || r.table_name,
-                    r.table_name,
-                    r.pk_col
-                );
-            end if;
-        end loop;
-
-    exception
-        when others then
-            raise;
-    end;
-end $$;
-
-/*Creacion de los triggers para ultimo login*/
-
-do $$
-declare
-    r record;
-begin
-    begin
-        for r in
-            select table_name
-            from information_schema.columns
-            where table_schema = 'core'
-              and column_name = 'usuariomodificacion'
-              and table_name <> 'usuarios'
-        loop
-            execute format('drop trigger if exists %I on %I;', 'trg_lastlogin_' || r.table_name, r.table_name);
-
-            execute format(
-                'create trigger %I after insert or update on %I for each row execute function fn_update_last_login();',
-                'trg_lastlogin_' || r.table_name,
-                r.table_name
-            );
-        end loop;
-    exception
-        when others then
-            raise;
-    end;
-end $$;
+DROP TRIGGER IF EXISTS trg_calc_descuentos ON ordendetalledescuentos;
+CREATE TRIGGER trg_calc_descuentos
+AFTER INSERT OR UPDATE OR DELETE ON ordendetalledescuentos
+FOR EACH ROW EXECUTE FUNCTION fn_trigger_recalculo_detalle();

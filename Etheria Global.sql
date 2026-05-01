@@ -1,49 +1,46 @@
-/*==============================================================*/
-/* DATABASE                                                     */
-/*==============================================================*/
-
-/*DO $$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'etheria_global') THEN
-        CREATE DATABASE etheria_global;
-    END IF;
-END $$;*/
-
--- Ejecutar luego:
--- \c etheria_global;
-
 
 /*==============================================================*/
-/* EXTENSIONS                                                   */
+/* ETHERIA GLOBAL - SCRIPT                 */
+/* PostgreSQL + PostGIS + pgcrypto                              */
 /*==============================================================*/
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-
 /*==============================================================*/
-/* SCHEMA                                                       */
+/* LIMPIEZA OPCIONAL                                             */
 /*==============================================================*/
-
-CREATE SCHEMA IF NOT EXISTS core;
+/*
+DROP SCHEMA IF EXISTS core CASCADE;
+CREATE SCHEMA core;
 SET search_path TO core;
-
+*/
 
 /*==============================================================*/
 /* ENUMS                                                        */
 /*==============================================================*/
 
-CREATE TYPE tipo_impuesto AS ENUM ('porcentaje','monto_fijo');
-CREATE TYPE tipo_movimiento_cuenta AS ENUM ('Debito','Credito');
-CREATE TYPE estado_cuenta_enum AS ENUM ('pendiente','completado','cancelado');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_impuesto') THEN
+        CREATE TYPE tipo_impuesto AS ENUM ('porcentaje','monto_fijo');
+    END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_movimiento_cuenta') THEN
+        CREATE TYPE tipo_movimiento_cuenta AS ENUM ('Debito','Credito');
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_cuenta_enum') THEN
+        CREATE TYPE estado_cuenta_enum AS ENUM ('pendiente','completado','cancelado');
+    END IF;
+END $$;
 
 /*==============================================================*/
-/* 1. SEGURIDAD                                                 */
+/* TABLAS                                                       */
 /*==============================================================*/
 
-CREATE TABLE Usuarios (
+CREATE TABLE IF NOT EXISTS Usuarios (
     usuarioID SERIAL PRIMARY KEY,
     nombreUsuario VARCHAR(50) NOT NULL,
     apellido VARCHAR(50) NOT NULL,
@@ -56,29 +53,29 @@ CREATE TABLE Usuarios (
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE Roles (
+CREATE TABLE IF NOT EXISTS Roles (
     roleID SERIAL PRIMARY KEY,
-    rolNombre VARCHAR(40) NOT NULL,
+    rolNombre VARCHAR(40) UNIQUE NOT NULL,
     descripcion VARCHAR(500) NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE RolesXUsuario (
+CREATE TABLE IF NOT EXISTS RolesXUsuario (
     usuarioID INT NOT NULL,
     roleID INT NOT NULL,
     asignado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (usuarioID, roleID),
     FOREIGN KEY (usuarioID) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
-    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION ON UPDATE NO ACTION   
+    FOREIGN KEY (roleID) REFERENCES Roles(roleID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE PermisosSistema (
+CREATE TABLE IF NOT EXISTS PermisosSistema (
     permisoID SERIAL PRIMARY KEY,
-    nombrePermiso VARCHAR(30) NOT NULL,
+    nombrePermiso VARCHAR(30) UNIQUE NOT NULL,
     descripcion VARCHAR(200)
 );
 
-CREATE TABLE PermisosXRole (
+CREATE TABLE IF NOT EXISTS PermisosXRole (
     roleID INT NOT NULL,
     permisoID INT NOT NULL,
     PRIMARY KEY (roleID, permisoID),
@@ -86,23 +83,18 @@ CREATE TABLE PermisosXRole (
     FOREIGN KEY (permisoID) REFERENCES PermisosSistema(permisoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 2. AUDITORIA                                                 */
-/*==============================================================*/
-
-CREATE TABLE TablasSistema (
+CREATE TABLE IF NOT EXISTS TablasSistema (
     tablaID SERIAL PRIMARY KEY,
     nombreTabla VARCHAR(50) UNIQUE NOT NULL,
     creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Acciones (
+CREATE TABLE IF NOT EXISTS Acciones (
     accionID SERIAL PRIMARY KEY,
-    nombreAccion VARCHAR(10) NOT NULL CHECK (nombreAccion IN ('CREATE','UPDATE','DELETE','ERROR'))
+    nombreAccion VARCHAR(10) UNIQUE NOT NULL CHECK (nombreAccion IN ('CREATE','UPDATE','DELETE','ERROR','READ'))
 );
 
-CREATE TABLE Logs (
+CREATE TABLE IF NOT EXISTS Logs (
     logID SERIAL PRIMARY KEY,
     usuarioModificacion INT,
     tablaID INT NOT NULL,
@@ -118,26 +110,21 @@ CREATE TABLE Logs (
     FOREIGN KEY (accionID) REFERENCES Acciones(accionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 3. GEOGRAFIA                                                 */
-/*==============================================================*/
-
-CREATE TABLE Paises (
+CREATE TABLE IF NOT EXISTS Paises (
     paisID SERIAL PRIMARY KEY,
     nombrePais VARCHAR(30) NOT NULL,
     codigoISO VARCHAR(3) UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE NivelesGeograficos (
+CREATE TABLE IF NOT EXISTS NivelesGeograficos (
     nivelID SERIAL PRIMARY KEY,
-    nombreNGeografico VARCHAR(50) NOT NULL,
-    orden INT NOT NULL,
+    nombreNGeografico VARCHAR(50) UNIQUE NOT NULL,
+    orden INT UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE DivisionesGeograficas (
+CREATE TABLE IF NOT EXISTS DivisionesGeograficas (
     divisionID SERIAL PRIMARY KEY,
     paisID INT NOT NULL,
     nivelID INT NOT NULL,
@@ -148,7 +135,10 @@ CREATE TABLE DivisionesGeograficas (
     FOREIGN KEY (padreID) REFERENCES DivisionesGeograficas(divisionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE Direcciones (
+CREATE UNIQUE INDEX IF NOT EXISTS ux_divisiones_geograficas_unicas
+ON DivisionesGeograficas(paisID, nivelID, COALESCE(padreID, 0), nombre);
+
+CREATE TABLE IF NOT EXISTS Direcciones (
     direccionID SERIAL PRIMARY KEY,
     divisionID INT NOT NULL,
     usuarioModificacion INT,
@@ -164,17 +154,12 @@ CREATE TABLE Direcciones (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 4. CONTACTOS Y LOGISTICA                                     */
-/*==============================================================*/
-
-CREATE TABLE TiposContactos (
+CREATE TABLE IF NOT EXISTS TiposContactos (
     tipoContactoID SERIAL PRIMARY KEY,
-    nombreTipoContacto VARCHAR(20) NOT NULL
+    nombreTipoContacto VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE Contactos (
+CREATE TABLE IF NOT EXISTS Contactos (
     contactoID SERIAL PRIMARY KEY,
     tipoContactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -186,12 +171,12 @@ CREATE TABLE Contactos (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE TiposTelefonos (
+CREATE TABLE IF NOT EXISTS TiposTelefonos (
     tipoTelefonoID SERIAL PRIMARY KEY,
-    nombreTipoTelefono VARCHAR(20) NOT NULL
+    nombreTipoTelefono VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE TelefonosContactos (
+CREATE TABLE IF NOT EXISTS TelefonosContactos (
     telefonoContactoID SERIAL PRIMARY KEY,
     contactoID INT NOT NULL,
     tipoTelefonosID INT NOT NULL,
@@ -203,7 +188,7 @@ CREATE TABLE TelefonosContactos (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE CorreosContactos (
+CREATE TABLE IF NOT EXISTS CorreosContactos (
     correoContactoID SERIAL PRIMARY KEY,
     contactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -213,18 +198,18 @@ CREATE TABLE CorreosContactos (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE TiposCentroLogistico (
+CREATE TABLE IF NOT EXISTS TiposCentroLogistico (
     tipoID SERIAL PRIMARY KEY,
-    nombreTipoCLogistico VARCHAR(20) NOT NULL
+    nombreTipoCLogistico VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE CentrosLogisticos (
+CREATE TABLE IF NOT EXISTS CentrosLogisticos (
     centroLogisticoID SERIAL PRIMARY KEY,
     tipoID INT NOT NULL,
     direccionID INT NOT NULL,
     contactoID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
-    nombreCentroLogistico VARCHAR(50) NOT NULL,
+    nombreCentroLogistico VARCHAR(50) UNIQUE NOT NULL,
     telefono VARCHAR(20) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (tipoID) REFERENCES TiposCentroLogistico(tipoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
@@ -233,20 +218,15 @@ CREATE TABLE CentrosLogisticos (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 5. PROVEEDORES                                               */
-/*==============================================================*/
-
-CREATE TABLE Proveedores (
+CREATE TABLE IF NOT EXISTS Proveedores (
     proveedorID SERIAL PRIMARY KEY,
     direccionID INT NOT NULL,
-    nombreProveedor VARCHAR(50) NOT NULL,
+    nombreProveedor VARCHAR(50) UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (direccionID) REFERENCES Direcciones(direccionID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE ContactosProveedor (
+CREATE TABLE IF NOT EXISTS ContactosProveedor (
     proveedorID INT NOT NULL,
     contactoID INT NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
@@ -255,38 +235,33 @@ CREATE TABLE ContactosProveedor (
     FOREIGN KEY (contactoID) REFERENCES Contactos(contactoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 6. PRODUCTOS                                                 */
-/*==============================================================*/
-
-CREATE TABLE Categorias (
+CREATE TABLE IF NOT EXISTS Categorias (
     categoriaID SERIAL PRIMARY KEY,
-    nombreCategoriaP VARCHAR(20) UNIQUE NOT NULL,
+    nombreCategoriaP VARCHAR(40) UNIQUE NOT NULL,
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE Productos (
+CREATE TABLE IF NOT EXISTS Productos (
     productoID SERIAL PRIMARY KEY,
     categoriaID INT NOT NULL,
     usuarioModificacion INT,
     proveedorID INT NOT NULL,
-    precio DECIMAL(18,6) NOT NULL,
-    nombreProducto VARCHAR(40) NOT NULL,
-    descripcion VARCHAR(200) NOT NULL,
-    descripcionManejo VARCHAR(200) NOT NULL,
+    precio DECIMAL(18,6) NOT NULL CHECK (precio >= 0),
+    nombreProducto VARCHAR(100) UNIQUE NOT NULL,
+    descripcion VARCHAR(300) NOT NULL,
+    descripcionManejo VARCHAR(300) NOT NULL,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (categoriaID) REFERENCES Categorias(categoriaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (proveedorID) REFERENCES Proveedores(proveedorID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE Caracteristicas (
+CREATE TABLE IF NOT EXISTS Caracteristicas (
     caracteristicaID SERIAL PRIMARY KEY,
-    nombreCaracteristicaP VARCHAR(50) NOT NULL
+    nombreCaracteristicaP VARCHAR(50) UNIQUE NOT NULL
 );
 
-CREATE TABLE ValorCaracteristicas (
+CREATE TABLE IF NOT EXISTS ValorCaracteristicas (
     productoID INT NOT NULL,
     caracteristicaID INT NOT NULL,
     valor VARCHAR(50) NOT NULL,
@@ -296,24 +271,19 @@ CREATE TABLE ValorCaracteristicas (
     FOREIGN KEY (caracteristicaID) REFERENCES Caracteristicas(caracteristicaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 7. MONEDAS                                                   */
-/*==============================================================*/
-
-CREATE TABLE Monedas (
+CREATE TABLE IF NOT EXISTS Monedas (
     monedaID SERIAL PRIMARY KEY,
     usuarioModificacion INT NOT NULL,
     paisID INT NOT NULL,
     simboloMoneda VARCHAR(10) NOT NULL,
-    nombreMoneda VARCHAR(50) NOT NULL,
+    nombreMoneda VARCHAR(50) UNIQUE NOT NULL,
     tiempoCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE TiposCambio (
+CREATE TABLE IF NOT EXISTS TiposCambio (
     tipoCambioID SERIAL PRIMARY KEY,
     usuarioModificacion INT,
     moneda1ID INT NOT NULL,
@@ -329,7 +299,9 @@ CREATE TABLE TiposCambio (
     FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE HistorialCambiosMonedas (
+CREATE UNIQUE INDEX IF NOT EXISTS ux_tiposcambio_par ON TiposCambio(moneda1ID, moneda2ID);
+
+CREATE TABLE IF NOT EXISTS HistorialCambiosMonedas (
     historialCambioID SERIAL PRIMARY KEY,
     moneda1ID INT NOT NULL,
     moneda2ID INT NOT NULL,
@@ -342,21 +314,16 @@ CREATE TABLE HistorialCambiosMonedas (
     horaCambio TIMESTAMP,
     FOREIGN KEY (moneda1ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (moneda2ID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
-    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION, 
+    FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 8. PERMISOS IMPORTACION                                      */
-/*==============================================================*/
-
-CREATE TABLE TiposPermisos (
+CREATE TABLE IF NOT EXISTS TiposPermisos (
     tipoPermisoID SERIAL PRIMARY KEY,
-    nombreTipoPermiso VARCHAR(20) NOT NULL
+    nombreTipoPermiso VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE PermisosImportacion (
+CREATE TABLE IF NOT EXISTS PermisosImportacion (
     permisoID SERIAL PRIMARY KEY,
     paisID INT NOT NULL,
     tipoPermisoID INT NOT NULL,
@@ -364,39 +331,36 @@ CREATE TABLE PermisosImportacion (
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6) NOT NULL,
-    nombrePermiso VARCHAR(20) NOT NULL,
+    nombrePermiso VARCHAR(50) NOT NULL,
     descripcion VARCHAR(200) NOT NULL,
     urlDocumentacion TEXT NOT NULL,
     costo DECIMAL(18,6) NOT NULL CHECK (costo >= 0),
     activo BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (paisID) REFERENCES Paises(paisID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (tipoPermisoID) REFERENCES TiposPermisos(tipoPermisoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
-    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION, 
+    FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS ux_permisos_pais_tipo ON PermisosImportacion(paisID, tipoPermisoID);
 
-/*==============================================================*/
-/* 9. INVENTARIO                                                */
-/*==============================================================*/
-
-CREATE TABLE Lotes (
+CREATE TABLE IF NOT EXISTS Lotes (
     loteID SERIAL PRIMARY KEY,
     productoID INT NOT NULL,
     cantidadProductoLoteInicial INT NOT NULL CHECK (cantidadProductoLoteInicial > 0),
-    cantidadProductoLoteDisponible INT NOT NULL CHECK (cantidadProductoLoteDisponible <= cantidadProductoLoteInicial),
+    cantidadProductoLoteDisponible INT NOT NULL CHECK (cantidadProductoLoteDisponible >= 0 AND cantidadProductoLoteDisponible <= cantidadProductoLoteInicial),
     fechaFabricacion TIMESTAMP NOT NULL,
     fechaVencimiento TIMESTAMP,
     FOREIGN KEY (productoID) REFERENCES Productos(productoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE TipoMovimientosInventario (
+CREATE TABLE IF NOT EXISTS TipoMovimientosInventario (
     tipoMovimientoInventarioID SERIAL PRIMARY KEY,
-    nombreTipoMovimientoInventario VARCHAR(20) NOT NULL
+    nombreTipoMovimientoInventario VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE MovimientosInventario (
+CREATE TABLE IF NOT EXISTS MovimientosInventario (
     movimientoID SERIAL PRIMARY KEY,
     loteID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -408,9 +372,9 @@ CREATE TABLE MovimientosInventario (
     FOREIGN KEY (tipoMovimientoInventarioID) REFERENCES TipoMovimientosInventario(tipoMovimientoInventarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE Inventarios (
+CREATE TABLE IF NOT EXISTS Inventarios (
     inventarioID SERIAL PRIMARY KEY,
-    loteID INT NOT NULL,
+    loteID INT UNIQUE NOT NULL,
     usuarioModificacion INT,
     cantidadDisponible INT NOT NULL CHECK (cantidadDisponible >= 0),
     ultimaActualizacion TIMESTAMP,
@@ -418,12 +382,7 @@ CREATE TABLE Inventarios (
     FOREIGN KEY (usuarioModificacion) REFERENCES Usuarios(usuarioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 10. PRECIOS                                                  */
-/*==============================================================*/
-
-CREATE TABLE HistorialPreciosProducto (
+CREATE TABLE IF NOT EXISTS HistorialPreciosProducto (
     historialPrecioID SERIAL PRIMARY KEY,
     productoID INT NOT NULL,
     precio DECIMAL(18,6) NOT NULL,
@@ -435,11 +394,7 @@ CREATE TABLE HistorialPreciosProducto (
     FOREIGN KEY (monedaID) REFERENCES Monedas(monedaID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-/*==============================================================*/
-/* 11. IMPUESTOS                                                */
-/*==============================================================*/
-
-CREATE TABLE ImpuestosPais (
+CREATE TABLE IF NOT EXISTS ImpuestosPais (
     impuestoID SERIAL PRIMARY KEY,
     paisID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -447,7 +402,7 @@ CREATE TABLE ImpuestosPais (
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6) NOT NULL,
     nombre VARCHAR(50) NOT NULL,
-    valor DECIMAL(5,2) NOT NULL,
+    valor DECIMAL(18,6) NOT NULL,
     tipo tipo_impuesto NOT NULL,
     CHECK (
         (tipo = 'porcentaje' AND valor > 0 AND valor <= 100)
@@ -463,21 +418,19 @@ CREATE TABLE ImpuestosPais (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-/*==============================================================*/
-/* 12. ORDENES                                                  */
-/*==============================================================*/
+CREATE UNIQUE INDEX IF NOT EXISTS ux_impuestos_pais_nombre ON ImpuestosPais(paisID, nombre);
 
-CREATE TABLE EstadosOrdenes (
+CREATE TABLE IF NOT EXISTS EstadosOrdenes (
     estadoID SERIAL PRIMARY KEY,
-    nombreEstadoOrden VARCHAR(10) UNIQUE NOT NULL
+    nombreEstadoOrden VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE TiposOrden (
+CREATE TABLE IF NOT EXISTS TiposOrden (
     tipoOrdenID SERIAL PRIMARY KEY,
     nombre VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE Ordenes (
+CREATE TABLE IF NOT EXISTS Ordenes (
     ordenID SERIAL PRIMARY KEY,
     estadoID INT NOT NULL,
     tipoOrdenID INT NOT NULL,
@@ -487,7 +440,7 @@ CREATE TABLE Ordenes (
     monedaID INT NOT NULL,
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6) NOT NULL,
-    numeroOrden VARCHAR(30) NOT NULL,
+    numeroOrden VARCHAR(30) UNIQUE NOT NULL,
     precioFinal DECIMAL(18,6) NOT NULL,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION ON UPDATE NO ACTION,
@@ -499,7 +452,7 @@ CREATE TABLE Ordenes (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE OrdenDetalles (
+CREATE TABLE IF NOT EXISTS OrdenDetalles (
     ordenDetalleID SERIAL PRIMARY KEY,
     ordenID INT NOT NULL,
     productoID INT NOT NULL,
@@ -519,23 +472,23 @@ CREATE TABLE OrdenDetalles (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE OrdenDetalleImpuestos (
-    ordenDetalleID INT,
-    impuestoID INT,
+CREATE TABLE IF NOT EXISTS OrdenDetalleImpuestos (
+    ordenDetalleID INT NOT NULL,
+    impuestoID INT NOT NULL,
     PRIMARY KEY (ordenDetalleID, impuestoID),
     FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (impuestoID) REFERENCES ImpuestosPais(impuestoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE OrdenDetallePermisos (
-    ordenDetalleID INT,
-    permisoID INT,
+CREATE TABLE IF NOT EXISTS OrdenDetallePermisos (
+    ordenDetalleID INT NOT NULL,
+    permisoID INT NOT NULL,
     PRIMARY KEY (ordenDetalleID, permisoID),
     FOREIGN KEY (ordenDetalleID) REFERENCES OrdenDetalles(ordenDetalleID) ON DELETE NO ACTION ON UPDATE NO ACTION,
     FOREIGN KEY (permisoID) REFERENCES PermisosImportacion(permisoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE OrdenDetalleDescuentos (
+CREATE TABLE IF NOT EXISTS OrdenDetalleDescuentos (
     ordenDetalleDescuentoID SERIAL PRIMARY KEY,
     ordenDetalleID INT NOT NULL,
     monedaID INT NOT NULL,
@@ -548,12 +501,7 @@ CREATE TABLE OrdenDetalleDescuentos (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 13. TRAZABILIDAD                                             */
-/*==============================================================*/
-
-CREATE TABLE TrazabilidadOrden (
+CREATE TABLE IF NOT EXISTS TrazabilidadOrden (
     trazabilidadID SERIAL PRIMARY KEY,
     ordenID INT NOT NULL,
     centroLogisticoID INT NOT NULL,
@@ -568,21 +516,17 @@ CREATE TABLE TrazabilidadOrden (
     FOREIGN KEY (estadoID) REFERENCES EstadosOrdenes(estadoID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-/*==============================================================*/
-/* 14. TRANSACCIONES                                            */
-/*==============================================================*/
-
-CREATE TABLE EstadoTransacciones (
+CREATE TABLE IF NOT EXISTS EstadoTransacciones (
     estadoTransaccionID SERIAL PRIMARY KEY,
-    nombreEstadoTransac VARCHAR(20) NOT NULL
+    nombreEstadoTransac VARCHAR(20) UNIQUE NOT NULL
 );
 
-CREATE TABLE TipoTransacciones (
+CREATE TABLE IF NOT EXISTS TipoTransacciones (
     tipoID SERIAL PRIMARY KEY,
-    nombreTipoTransac VARCHAR(20) NOT NULL
+    nombreTipoTransac VARCHAR(30) UNIQUE NOT NULL
 );
 
-CREATE TABLE Transacciones (
+CREATE TABLE IF NOT EXISTS Transacciones (
     transaccionID SERIAL PRIMARY KEY,
     monedaID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -591,7 +535,7 @@ CREATE TABLE Transacciones (
     ordenID INT NOT NULL,
     tipoCambioID INT NOT NULL,
     tipoCambio DECIMAL(18,6) NOT NULL,
-    monto DECIMAL(18,6) NOT NULL CHECK (monto > 0),
+    monto DECIMAL(18,6) NOT NULL CHECK (monto >= 0),
     descripcion TEXT,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     checksum TEXT,
@@ -603,12 +547,7 @@ CREATE TABLE Transacciones (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-
-/*==============================================================*/
-/* 15. ESTADOS DE CUENTA                                        */
-/*==============================================================*/
-
-CREATE TABLE EstadosCuenta (
+CREATE TABLE IF NOT EXISTS EstadosCuenta (
     estadoCuentaID SERIAL PRIMARY KEY,
     ordenID INT NOT NULL,
     usuarioModificacion INT NOT NULL,
@@ -626,7 +565,7 @@ CREATE TABLE EstadosCuenta (
     FOREIGN KEY (tipoCambioID) REFERENCES TiposCambio(tipoCambioID) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
-CREATE TABLE BalanceNeto (
+CREATE TABLE IF NOT EXISTS BalanceNeto (
     balanceID SERIAL PRIMARY KEY,
     saldo DECIMAL(18,6) NOT NULL,
     ultimaActualizacion TIMESTAMP
