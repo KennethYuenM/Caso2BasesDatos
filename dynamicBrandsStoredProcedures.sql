@@ -1,10 +1,5 @@
 USE dynamicBrandsDB;
-
 DELIMITER $$
-
--- =========================================================
--- SP DE LOGGING: registra cada paso ejecutado por los demas SP
--- =========================================================
 DROP PROCEDURE IF EXISTS spLogEtlStep $$
 CREATE PROCEDURE spLogEtlStep(
     IN processNameParam VARCHAR(60),
@@ -41,10 +36,6 @@ BEGIN
         CURRENT_TIMESTAMP
     );
 END $$
-
--- =========================================================
--- SP DE CATALOGOS BASE
--- =========================================================
 DROP PROCEDURE IF EXISTS spSeedBaseCatalogs $$
 CREATE PROCEDURE spSeedBaseCatalogs()
 BEGIN
@@ -53,51 +44,42 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spSeedBaseCatalogs', 'MANUAL', 'dynamicBrandsDB', 'ERROR', 0, 0, 'Error al insertar catalogos base');
     END;
-
     START TRANSACTION;
-
     INSERT IGNORE INTO userRole (roleCode, roleName, roleDescription, isActive, createdAt, updatedAt) VALUES
     ('ADMIN', 'Administrator', 'Full access user', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('MANAGER', 'Manager', 'Management user', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('ANALYST', 'Analyst', 'Analytics user', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('OPERATOR', 'Operator', 'Operational user', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO personType (personTypeCode, personTypeName, personTypeDescription, isActive, createdAt, updatedAt) VALUES
     ('CUSTOMER', 'Customer', 'External customer', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SYSTEM_USER', 'System User', 'Internal system user', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('BOTH', 'Customer and System User', 'Person with customer and internal user capabilities', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO dynamicSiteStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('DRAFT', 'Draft', 'Draft site', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('ACTIVE', 'Active', 'Active site', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('PAUSED', 'Paused', 'Temporarily paused site', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CLOSED', 'Closed', 'Closed site', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO dynamicSiteGenerationStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('PENDING', 'Pending', 'Pending generation', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RUNNING', 'Running', 'Generation process is running', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SUCCESS', 'Success', 'Successful generation', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('FAILED', 'Failed', 'Failed generation', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO dynamicSiteEventType (eventTypeCode, eventName, eventDescription, isActive, createdAt, updatedAt) VALUES
     ('SITE_CREATED', 'Site Created', 'Site was created', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SITE_UPDATED', 'Site Updated', 'Site was updated', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SITE_STATUS_CHANGED', 'Site Status Changed', 'Site status was changed', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('AI_CONFIGURATION_CHANGED', 'AI Configuration Changed', 'AI generated configuration was changed', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO changeSource (sourceCode, sourceName, sourceDescription, isActive, createdAt, updatedAt) VALUES
     ('SYSTEM', 'System', 'System generated change', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('MANUAL', 'Manual', 'Manual change', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('ETL', 'ETL', 'ETL process change', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('API', 'API', 'External API process change', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO orderStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('CREATED', 'Created', 'Order created', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('PAID', 'Paid', 'Order paid', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SHIPPED', 'Shipped', 'Order shipped', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('DELIVERED', 'Delivered', 'Order delivered', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CANCELLED', 'Cancelled', 'Order cancelled', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO metricType (metricTypeCode, metricName, metricDescription, valueType, isActive, createdAt, updatedAt) VALUES
     ('VISITS', 'Visits', 'Visit count', 'COUNT', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SESSIONS', 'Sessions', 'Session count', 'COUNT', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -105,77 +87,63 @@ BEGIN
     ('CONVERSION_RATE', 'Conversion Rate', 'Purchase conversion rate', 'RATE', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('REVENUE', 'Revenue', 'Revenue amount', 'MONEY', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('BOUNCE_RATE', 'Bounce Rate', 'Bounce rate', 'RATE', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO productCategory (categoryCode, categoryName, categoryDescription, isActive, createdAt, updatedAt) VALUES
-    ('OIL', 'Oil', 'Oil products', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('SOAP', 'Soap', 'Soap products', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('BEAUTY', 'Beauty', 'Beauty products', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('FOOD', 'Food', 'Food products', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('BEVERAGE', 'Beverage', 'Beverage products', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
+    ('BEVERAGE', 'Bebidas', 'Bebidas naturales y funcionales', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('FOOD', 'Alimentos', 'Alimentos organicos y funcionales', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('DERM', 'Cosmetica dermatologica', 'Productos para cuidado de la piel', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('HAIR', 'Cosmetica capilar', 'Productos para cuidado del cabello', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('AROMA', 'Aromaterapia', 'Productos de aromaterapia y bienestar', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('SOAP', 'Jabones', 'Jabones artesanales y naturales', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('ESSOIL', 'Aceites esenciales', 'Aceites esenciales puros y mezclas', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
     INSERT IGNORE INTO productImageType (typeCode, typeName, typeDescription, isActive, createdAt, updatedAt) VALUES
     ('MAIN', 'Main', 'Main product image', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('GALLERY', 'Gallery', 'Gallery image', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('DETAIL', 'Detail', 'Detailed product image', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO packagingType (packagingTypeCode, packagingTypeName, packagingTypeDescription, isActive, createdAt, updatedAt) VALUES
     ('BOTTLE', 'Bottle', 'Bottle packaging', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('BOX', 'Box', 'Box packaging', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('BAG', 'Bag', 'Bag packaging', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('JAR', 'Jar', 'Jar packaging', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO labelType (labelTypeCode, labelTypeName, labelTypeDescription, isActive, createdAt, updatedAt) VALUES
     ('PRIMARY', 'Primary', 'Primary label', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('WARNING', 'Warning', 'Warning label', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('LEGAL', 'Legal', 'Legal label', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('NUTRITIONAL', 'Nutritional', 'Nutritional label', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO regulatoryRequirementType (requirementTypeCode, requirementTypeName, requirementTypeDescription, isActive, createdAt, updatedAt) VALUES
     ('HEALTH', 'Health', 'Health requirement', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('IMPORT', 'Import', 'Import requirement', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('LABELING', 'Labeling', 'Labeling requirement', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('PACKAGING', 'Packaging', 'Packaging requirement', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO paymentTransactionStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('PENDING', 'Pending', 'Pending payment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('APPROVED', 'Approved', 'Approved payment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('REJECTED', 'Rejected', 'Rejected payment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('REFUNDED', 'Refunded', 'Refunded payment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO paymentMethod (methodCode, methodName, providerName, providerDescription, methodDescription, config, isActive, createdAt, updatedAt) VALUES
     ('VISA', 'Visa', 'Visa', 'Visa card network', 'Card payment', JSON_OBJECT('type', 'card', 'requires3DS', true), TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('MASTERCARD', 'Mastercard', 'Mastercard', 'Mastercard card network', 'Card payment', JSON_OBJECT('type', 'card', 'requires3DS', true), TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('SINPE', 'SINPE', 'SINPE', 'Costa Rica bank transfer network', 'Bank transfer', JSON_OBJECT('type', 'transfer', 'manualConfirmation', true), TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO permissionStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('PENDING', 'Pending', 'Pending permission', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('APPROVED', 'Approved', 'Approved permission', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('REJECTED', 'Rejected', 'Rejected permission', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('EXPIRED', 'Expired', 'Expired permission', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO shipmentStatus (statusCode, statusName, statusDescription, isActive, createdAt, updatedAt) VALUES
     ('PENDING', 'Pending', 'Pending shipment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('IN_TRANSIT', 'In Transit', 'Shipment in transit', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('DELIVERED', 'Delivered', 'Delivered shipment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RETURNED', 'Returned', 'Returned shipment', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO shipmentViewType (viewTypeCode, viewTypeName, viewTypeDescription, isActive, createdAt, updatedAt) VALUES
     ('CUSTOMER', 'Customer', 'Customer view', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('INTERNAL', 'Internal', 'Internal view', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     INSERT IGNORE INTO inventorySource (sourceCode, sourceName, sourceDescription, isActive, createdAt, updatedAt) VALUES
     ('HUB', 'Hub', 'Hub inventory', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('MANUAL', 'Manual', 'Manual update', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('ORDER', 'Order', 'Inventory movement from order', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RETURN', 'Return', 'Inventory movement from return', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
     COMMIT;
     CALL spLogEtlStep('spSeedBaseCatalogs', 'MANUAL', 'dynamicBrandsDB', 'SUCCESS', 0, 0, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: CURRENCY
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCurrency $$
 CREATE PROCEDURE spInsertCurrency(
     IN currencyCodeParam VARCHAR(20),
@@ -188,23 +156,15 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCurrency', 'MANUAL', 'currency', 'ERROR', 0, 0, 'Error al insertar moneda');
     END;
-
     START TRANSACTION;
-
     IF currencyCodeParam IS NULL OR TRIM(currencyCodeParam) = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'currencyCodeParam is required';
     END IF;
-
     INSERT INTO currency (currencyCode, currencyName, currencySymbol)
     VALUES (currencyCodeParam, currencyNameParam, currencySymbolParam);
-
     COMMIT;
     CALL spLogEtlStep('spInsertCurrency', 'MANUAL', 'currency', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: COUNTRY
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountry $$
 CREATE PROCEDURE spInsertCountry(
     IN countryNameParam VARCHAR(50),
@@ -218,23 +178,15 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCountry', 'MANUAL', 'country', 'ERROR', 0, 0, 'Error al insertar pais');
     END;
-
     START TRANSACTION;
-
     IF CHAR_LENGTH(iso2CodeParam) <> 2 OR CHAR_LENGTH(iso3CodeParam) <> 3 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid ISO code length';
     END IF;
-
     INSERT INTO country (countryName, iso2Code, iso3Code, localCurrencyID)
     VALUES (countryNameParam, UPPER(iso2CodeParam), UPPER(iso3CodeParam), localCurrencyIDParam);
-
     COMMIT;
     CALL spLogEtlStep('spInsertCountry', 'MANUAL', 'country', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: CURRENT EXCHANGE RATE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCurrentExchangeRate $$
 CREATE PROCEDURE spInsertCurrentExchangeRate(
     IN exchangePairIDParam BIGINT,
@@ -246,28 +198,22 @@ CREATE PROCEDURE spInsertCurrentExchangeRate(
 )
 BEGIN
     DECLARE existingCount INT DEFAULT 0;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCurrentExchangeRate', 'MANUAL', 'currentExchangeRate', 'ERROR', 0, 0, 'Error al insertar tipo de cambio');
     END;
-
     START TRANSACTION;
-
     IF baseCurrencyIDParam = quoteCurrencyIDParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'baseCurrencyIDParam and quoteCurrencyIDParam cannot be equal';
     END IF;
-
     IF buyRateParam <= 0 OR sellRateParam <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Exchange rates must be greater than zero';
     END IF;
-
     SELECT COUNT(*) INTO existingCount
     FROM currentExchangeRate
     WHERE baseCurrencyID = baseCurrencyIDParam
       AND quoteCurrencyID = quoteCurrencyIDParam;
-
     IF existingCount > 0 THEN
         UPDATE currentExchangeRate
         SET exchangePairID = exchangePairIDParam,
@@ -295,7 +241,6 @@ BEGIN
             sourceNameParam
         );
     END IF;
-
     INSERT INTO historicalExchangeRate (
         exchangePairID,
         buyRate,
@@ -312,14 +257,9 @@ BEGIN
         NULL,
         CURRENT_TIMESTAMP
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertCurrentExchangeRate', 'MANUAL', 'currentExchangeRate', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PEOPLE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertPeople $$
 CREATE PROCEDURE spInsertPeople(
     IN personCodeParam VARCHAR(50),
@@ -338,17 +278,13 @@ BEGIN
         SET newPersonIDParam = NULL;
         CALL spLogEtlStep('spInsertPeople', 'MANUAL', 'people', 'ERROR', 0, 0, 'Error al insertar persona');
     END;
-
     START TRANSACTION;
-
     IF emailParam IS NULL OR TRIM(emailParam) = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'emailParam is required';
     END IF;
-
     IF personTypeCodeParam IS NULL OR TRIM(personTypeCodeParam) = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'personTypeCodeParam is required';
     END IF;
-
     INSERT INTO people (
         personCode,
         countryID,
@@ -369,19 +305,12 @@ BEGIN
         FALSE,
         TRUE
     );
-
     SET newPersonIDParam = LAST_INSERT_ID();
-
     INSERT INTO peoplePersonType (personID, personTypeCode)
     VALUES (newPersonIDParam, personTypeCodeParam);
-
     COMMIT;
     CALL spLogEtlStep('spInsertPeople', 'MANUAL', 'people', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: SYSTEM USER
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertSystemUser $$
 CREATE PROCEDURE spInsertSystemUser(
     IN personIDParam BIGINT,
@@ -394,26 +323,17 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertSystemUser', 'MANUAL', 'systemUser', 'ERROR', 0, 0, 'Error al insertar usuario de sistema');
     END;
-
     START TRANSACTION;
-
     IF userCodeParam IS NULL OR TRIM(userCodeParam) = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'userCodeParam is required';
     END IF;
-
     INSERT INTO systemUser (personID, userCode, roleCode)
     VALUES (personIDParam, userCodeParam, roleCodeParam);
-
     INSERT IGNORE INTO peoplePersonType (personID, personTypeCode)
     VALUES (personIDParam, 'SYSTEM_USER');
-
     COMMIT;
     CALL spLogEtlStep('spInsertSystemUser', 'MANUAL', 'systemUser', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: BRAND TEMPLATE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertBrandTemplate $$
 CREATE PROCEDURE spInsertBrandTemplate(
     IN brandCodeParam VARCHAR(30),
@@ -428,9 +348,7 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertBrandTemplate', 'MANUAL', 'brandTemplate', 'ERROR', 0, 0, 'Error al insertar brand template');
     END;
-
     START TRANSACTION;
-
     INSERT INTO brandTemplate (
         brandCode,
         brandName,
@@ -445,14 +363,9 @@ BEGIN
         corePromiseParam,
         targetAudienceParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertBrandTemplate', 'MANUAL', 'brandTemplate', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: DYNAMIC SITE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertDynamicSite $$
 CREATE PROCEDURE spInsertDynamicSite(
     IN siteCodeParam VARCHAR(30),
@@ -476,9 +389,7 @@ BEGIN
         SET newDynamicSiteIDParam = NULL;
         CALL spLogEtlStep('spInsertDynamicSite', 'MANUAL', 'dynamicSiteInfo', 'ERROR', 0, 0, 'Error al insertar sitio dinamico');
     END;
-
     START TRANSACTION;
-
     INSERT INTO dynamicSiteInfo (
         siteCode,
         siteName,
@@ -509,9 +420,7 @@ BEGIN
         clientNameParam,
         logoURLParam
     );
-
     SET newDynamicSiteIDParam = LAST_INSERT_ID();
-
     INSERT INTO dynamicSiteDomain (
         dynamicSiteID,
         domainName,
@@ -524,14 +433,9 @@ BEGIN
         TRUE,
         TRUE
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertDynamicSite', 'MANUAL', 'dynamicSiteInfo', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: DYNAMIC SITE METRIC
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertDynamicSiteMetric $$
 CREATE PROCEDURE spInsertDynamicSiteMetric(
     IN dynamicSiteIDParam BIGINT,
@@ -541,29 +445,23 @@ CREATE PROCEDURE spInsertDynamicSiteMetric(
 )
 BEGIN
     DECLARE existingCount INT DEFAULT 0;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertDynamicSiteMetric', 'MANUAL', 'dynamicSiteMetric', 'ERROR', 0, 0, 'Error al insertar metrica de sitio');
     END;
-
     START TRANSACTION;
-
     IF metricValueParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'metricValueParam cannot be negative';
     END IF;
-
     IF metricTypeCodeParam IN ('CONVERSION_RATE', 'BOUNCE_RATE') AND metricValueParam > 1 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Rate metrics must be between 0 and 1';
     END IF;
-
     SELECT COUNT(*) INTO existingCount
     FROM dynamicSiteMetric
     WHERE dynamicSiteID = dynamicSiteIDParam
       AND metricTypeCode = metricTypeCodeParam
       AND metricDate = metricDateParam;
-
     IF existingCount > 0 THEN
         UPDATE dynamicSiteMetric
         SET metricValue = metricValueParam,
@@ -585,14 +483,9 @@ BEGIN
             metricValueParam
         );
     END IF;
-
     COMMIT;
     CALL spLogEtlStep('spInsertDynamicSiteMetric', 'MANUAL', 'dynamicSiteMetric', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PRODUCT
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProduct $$
 CREATE PROCEDURE spInsertProduct(
     IN productCodeParam VARCHAR(50),
@@ -613,13 +506,10 @@ BEGIN
         SET newProductIDParam = NULL;
         CALL spLogEtlStep('spInsertProduct', 'MANUAL', 'product', 'ERROR', 0, 0, 'Error al insertar producto');
     END;
-
     START TRANSACTION;
-
     IF basePriceParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'basePriceParam cannot be negative';
     END IF;
-
     INSERT INTO product (
         productCode,
         dynamicSiteID,
@@ -642,16 +532,10 @@ BEGIN
         basePriceParam,
         updatedByPersonIDParam
     );
-
     SET newProductIDParam = LAST_INSERT_ID();
-
     COMMIT;
     CALL spLogEtlStep('spInsertProduct', 'MANUAL', 'product', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PRODUCT PRICE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductPrice $$
 CREATE PROCEDURE spInsertProductPrice(
     IN productIDParam BIGINT,
@@ -668,17 +552,13 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertProductPrice', 'MANUAL', 'productPrice', 'ERROR', 0, 0, 'Error al insertar precio de producto');
     END;
-
     START TRANSACTION;
-
     IF priceAmountParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'priceAmountParam cannot be negative';
     END IF;
-
     IF validToParam IS NOT NULL AND validToParam < validFromParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'validToParam cannot be earlier than validFromParam';
     END IF;
-
     IF isCurrentParam = TRUE THEN
         UPDATE productPrice
         SET isCurrent = FALSE,
@@ -688,7 +568,6 @@ BEGIN
           AND currencyID = currencyIDParam
           AND isCurrent = TRUE;
     END IF;
-
     INSERT INTO productPrice (
         productID,
         dynamicSiteID,
@@ -707,14 +586,9 @@ BEGIN
         validToParam,
         isCurrentParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertProductPrice', 'MANUAL', 'productPrice', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PRODUCT IMAGE
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductImage $$
 CREATE PROCEDURE spInsertProductImage(
     IN productIDParam BIGINT,
@@ -729,9 +603,7 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertProductImage', 'MANUAL', 'productImage', 'ERROR', 0, 0, 'Error al insertar imagen de producto');
     END;
-
     START TRANSACTION;
-
     IF isPrimaryParam = TRUE THEN
         UPDATE productImage
         SET isPrimary = FALSE,
@@ -739,7 +611,6 @@ BEGIN
         WHERE productID = productIDParam
           AND isPrimary = TRUE;
     END IF;
-
     INSERT INTO productImage (
         productID,
         typeCode,
@@ -754,14 +625,9 @@ BEGIN
         displayOrderParam,
         isPrimaryParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertProductImage', 'MANUAL', 'productImage', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PRODUCT PACKAGING
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductPackaging $$
 CREATE PROCEDURE spInsertProductPackaging(
     IN productIDParam BIGINT,
@@ -781,9 +647,7 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertProductPackaging', 'MANUAL', 'productPackaging', 'ERROR', 0, 0, 'Error al insertar empaque de producto');
     END;
-
     START TRANSACTION;
-
     IF isPrimaryParam = TRUE THEN
         UPDATE productPackaging
         SET isPrimary = FALSE,
@@ -792,7 +656,6 @@ BEGIN
           AND countryID = countryIDParam
           AND isPrimary = TRUE;
     END IF;
-
     INSERT INTO productPackaging (
         productID,
         countryID,
@@ -817,14 +680,9 @@ BEGIN
         isFragileParam,
         isPrimaryParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertProductPackaging', 'MANUAL', 'productPackaging', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PRODUCT LABEL
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertProductLabel $$
 CREATE PROCEDURE spInsertProductLabel(
     IN productIDParam BIGINT,
@@ -843,9 +701,7 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertProductLabel', 'MANUAL', 'productLabel', 'ERROR', 0, 0, 'Error al insertar etiqueta de producto');
     END;
-
     START TRANSACTION;
-
     IF isPrimaryParam = TRUE THEN
         UPDATE productLabel
         SET isPrimary = FALSE,
@@ -856,7 +712,6 @@ BEGIN
           AND labelTypeCode = labelTypeCodeParam
           AND isPrimary = TRUE;
     END IF;
-
     INSERT INTO productLabel (
         productID,
         dynamicSiteID,
@@ -879,14 +734,9 @@ BEGIN
         labelContentParam,
         isPrimaryParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertProductLabel', 'MANUAL', 'productLabel', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: COUNTRY PRODUCT REQUIREMENT
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountryProductRequirement $$
 CREATE PROCEDURE spInsertCountryProductRequirement(
     IN productIDParam BIGINT,
@@ -905,13 +755,10 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCountryProductRequirement', 'MANUAL', 'countryProductRequirement', 'ERROR', 0, 0, 'Error al insertar requerimiento regulatorio');
     END;
-
     START TRANSACTION;
-
     IF validToParam IS NOT NULL AND validFromParam IS NOT NULL AND validToParam < validFromParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'validToParam cannot be earlier than validFromParam';
     END IF;
-
     INSERT INTO countryProductRequirement (
         productID,
         countryID,
@@ -934,14 +781,9 @@ BEGIN
         validFromParam,
         validToParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertCountryProductRequirement', 'MANUAL', 'countryProductRequirement', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: COUNTRY PRODUCT PERMISSION
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCountryProductPermission $$
 CREATE PROCEDURE spInsertCountryProductPermission(
     IN productIDParam BIGINT,
@@ -962,17 +804,13 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCountryProductPermission', 'MANUAL', 'countryProductPermission', 'ERROR', 0, 0, 'Error al insertar permiso de producto');
     END;
-
     START TRANSACTION;
-
     IF permissionCostParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCostParam cannot be negative';
     END IF;
-
     IF expiresAtParam IS NOT NULL AND issuedAtParam IS NOT NULL AND expiresAtParam < issuedAtParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAtParam cannot be earlier than issuedAtParam';
     END IF;
-
     INSERT INTO countryProductPermission (
         productID,
         countryID,
@@ -999,14 +837,9 @@ BEGIN
         expiresAtParam,
         notesParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertCountryProductPermission', 'MANUAL', 'countryProductPermission', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION/ACTUALIZACION: INVENTORY
--- =========================================================
 DROP PROCEDURE IF EXISTS spUpsertInventory $$
 CREATE PROCEDURE spUpsertInventory(
     IN dynamicSiteIDParam BIGINT,
@@ -1019,30 +852,23 @@ CREATE PROCEDURE spUpsertInventory(
 BEGIN
     DECLARE sellableQuantityValue INT;
     DECLARE existingCount INT DEFAULT 0;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spUpsertInventory', 'MANUAL', 'inventory', 'ERROR', 0, 0, 'Error al insertar/actualizar inventario');
     END;
-
     START TRANSACTION;
-
     IF availableQuantityParam < 0 OR reservedQuantityParam < 0 OR reorderLevelParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Inventory quantities cannot be negative';
     END IF;
-
     SET sellableQuantityValue = availableQuantityParam - reservedQuantityParam;
-
     IF sellableQuantityValue < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reservedQuantityParam cannot be greater than availableQuantityParam';
     END IF;
-
     SELECT COUNT(*) INTO existingCount
     FROM inventory
     WHERE dynamicSiteID = dynamicSiteIDParam
       AND productID = productIDParam;
-
     IF existingCount > 0 THEN
         UPDATE inventory
         SET availableQuantity = availableQuantityParam,
@@ -1076,14 +902,9 @@ BEGIN
             CURRENT_TIMESTAMP
         );
     END IF;
-
     COMMIT;
     CALL spLogEtlStep('spUpsertInventory', 'MANUAL', 'inventory', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: CUSTOMER ORDER
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCustomerOrder $$
 CREATE PROCEDURE spInsertCustomerOrder(
     IN orderCodeParam VARCHAR(50),
@@ -1104,17 +925,13 @@ BEGIN
         SET newCustomerOrderIDParam = NULL;
         CALL spLogEtlStep('spInsertCustomerOrder', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, 'Error al insertar orden');
     END;
-
     START TRANSACTION;
-
     IF shippingAmountParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'shippingAmountParam cannot be negative';
     END IF;
-
     IF exchangeRateParam <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exchangeRateParam must be greater than zero';
     END IF;
-
     INSERT INTO customerOrder (
         orderCode,
         personID,
@@ -1137,16 +954,10 @@ BEGIN
         exchangeRateParam,
         notesParam
     );
-
     SET newCustomerOrderIDParam = LAST_INSERT_ID();
-
     COMMIT;
     CALL spLogEtlStep('spInsertCustomerOrder', 'MANUAL', 'customerOrder', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: CUSTOMER ORDER DETAIL
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertCustomerOrderDetail $$
 CREATE PROCEDURE spInsertCustomerOrderDetail(
     IN customerOrderIDParam BIGINT,
@@ -1158,29 +969,22 @@ CREATE PROCEDURE spInsertCustomerOrderDetail(
 )
 BEGIN
     DECLARE lineTotalValue DECIMAL(18,6);
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertCustomerOrderDetail', 'MANUAL', 'customerOrderDetail', 'ERROR', 0, 0, 'Error al insertar detalle de orden');
     END;
-
     START TRANSACTION;
-
     IF quantityParam <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'quantityParam must be greater than zero';
     END IF;
-
     IF unitPriceParam < 0 OR taxAmountParam < 0 OR discountAmountParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Amounts cannot be negative';
     END IF;
-
     SET lineTotalValue = ROUND((quantityParam * unitPriceParam) + taxAmountParam - discountAmountParam, 6);
-
     IF lineTotalValue < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'lineTotal cannot be negative';
     END IF;
-
     INSERT INTO customerOrderDetail (
         customerOrderID,
         productID,
@@ -1199,14 +1003,9 @@ BEGIN
         discountAmountParam,
         lineTotalValue
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertCustomerOrderDetail', 'MANUAL', 'customerOrderDetail', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE ACTUALIZACION: CUSTOMER ORDER STATUS
--- =========================================================
 DROP PROCEDURE IF EXISTS spUpdateCustomerOrderStatus $$
 CREATE PROCEDURE spUpdateCustomerOrderStatus(
     IN customerOrderIDParam BIGINT,
@@ -1216,25 +1015,20 @@ CREATE PROCEDURE spUpdateCustomerOrderStatus(
 )
 BEGIN
     DECLARE previousOrderStatusCodeValue VARCHAR(30);
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spUpdateCustomerOrderStatus', 'MANUAL', 'customerOrder', 'ERROR', 0, 0, 'Error al actualizar estado de orden');
     END;
-
     START TRANSACTION;
-
     SELECT orderStatusCode
     INTO previousOrderStatusCodeValue
     FROM customerOrder
     WHERE customerOrderID = customerOrderIDParam;
-
     UPDATE customerOrder
     SET orderStatusCode = orderStatusCodeParam,
         updatedAt = CURRENT_TIMESTAMP
     WHERE customerOrderID = customerOrderIDParam;
-
     INSERT INTO customerOrderStatusLog (
         customerOrderID,
         previousOrderStatusCode,
@@ -1255,14 +1049,9 @@ BEGIN
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
     );
-
     COMMIT;
     CALL spLogEtlStep('spUpdateCustomerOrderStatus', 'MANUAL', 'customerOrder', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: PAYMENT TRANSACTION
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertPaymentTransaction $$
 CREATE PROCEDURE spInsertPaymentTransaction(
     IN customerOrderIDParam BIGINT,
@@ -1277,23 +1066,18 @@ CREATE PROCEDURE spInsertPaymentTransaction(
 )
 BEGIN
     DECLARE checksumValue VARCHAR(80);
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertPaymentTransaction', 'MANUAL', 'paymentTransaction', 'ERROR', 0, 0, 'Error al insertar transaccion de pago');
     END;
-
     START TRANSACTION;
-
     IF transactionAmountParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'transactionAmountParam cannot be negative';
     END IF;
-
     IF exchangeRateParam <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exchangeRateParam must be greater than zero';
     END IF;
-
     SET checksumValue = SHA2(CONCAT(
         transactionCodeParam,
         '|',
@@ -1309,7 +1093,6 @@ BEGIN
         '|',
         exchangeRateParam
     ), 256);
-
     INSERT INTO paymentTransaction (
         customerOrderID,
         transactionCode,
@@ -1334,14 +1117,9 @@ BEGIN
         providerReferenceParam,
         checksumValue
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertPaymentTransaction', 'MANUAL', 'paymentTransaction', 'SUCCESS', 1, 1, NULL);
 END $$
-
--- =========================================================
--- SP DE INSERCION: SHIPMENT
--- =========================================================
 DROP PROCEDURE IF EXISTS spInsertShipment $$
 CREATE PROCEDURE spInsertShipment(
     IN customerOrderIDParam BIGINT,
@@ -1360,13 +1138,10 @@ BEGIN
         ROLLBACK;
         CALL spLogEtlStep('spInsertShipment', 'MANUAL', 'shipment', 'ERROR', 0, 0, 'Error al insertar envio');
     END;
-
     START TRANSACTION;
-
     IF deliveredAtParam IS NOT NULL AND shippedAtParam IS NOT NULL AND deliveredAtParam < shippedAtParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'deliveredAtParam cannot be earlier than shippedAtParam';
     END IF;
-
     INSERT INTO shipment (
         customerOrderID,
         shipmentCode,
@@ -1389,9 +1164,7 @@ BEGIN
         shippedAtParam,
         deliveredAtParam
     );
-
     COMMIT;
     CALL spLogEtlStep('spInsertShipment', 'MANUAL', 'shipment', 'SUCCESS', 1, 1, NULL);
 END $$
-
 DELIMITER ;
