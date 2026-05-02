@@ -1,25 +1,6 @@
-
-/*==============================================================*/
-/* ETHERIA GLOBAL - SCRIPT                 */
-/* PostgreSQL + PostGIS + pgcrypto                              */
-/*==============================================================*/
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-/*==============================================================*/
-/* LIMPIEZA OPCIONAL                                             */
-/*==============================================================*/
-/*
-DROP SCHEMA IF EXISTS core CASCADE;
-CREATE SCHEMA core;
-SET search_path TO core;
-*/
-
-/*==============================================================*/
-/* ENUMS                                                        */
-/*==============================================================*/
 
 DO $$
 BEGIN
@@ -35,10 +16,6 @@ BEGIN
         CREATE TYPE estado_cuenta_enum AS ENUM ('pendiente','completado','cancelado');
     END IF;
 END $$;
-
-/*==============================================================*/
-/* TABLAS                                                       */
-/*==============================================================*/
 
 CREATE TABLE IF NOT EXISTS Usuarios (
     usuarioID SERIAL PRIMARY KEY,

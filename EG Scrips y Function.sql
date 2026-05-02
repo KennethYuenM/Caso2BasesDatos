@@ -1,7 +1,3 @@
-/*==============================================================*/
-/* FUNCIONES BASE                                               */
-/*==============================================================*/
-
 CREATE OR REPLACE FUNCTION fn_generar_checksum(p_data jsonb)
 RETURNS text
 LANGUAGE plpgsql
@@ -439,7 +435,6 @@ DECLARE
     v_id int;
 BEGIN
 
-    -- evita recursión infinita
     IF pg_trigger_depth() > 1 THEN
         RETURN CASE
             WHEN tg_op = 'DELETE' THEN old
@@ -524,10 +519,6 @@ BEGIN
 
 END;
 $$;
-
-/*==============================================================*/
-/* TRIGGERS                                                     */
-/*==============================================================*/
 
 DROP TRIGGER IF EXISTS trg_direcciones_validar_division ON direcciones;
 CREATE TRIGGER trg_direcciones_validar_division

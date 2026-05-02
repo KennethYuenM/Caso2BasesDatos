@@ -58,10 +58,6 @@ BEGIN
     END LOOP;
 END $$;
 
-/*==============================================================*/
-/* PROCEDURES DE CARGA                                          */
-/*==============================================================*/
-
 CREATE OR REPLACE PROCEDURE sp_cargar_support_base()
 LANGUAGE plpgsql
 AS $$
@@ -723,7 +719,7 @@ BEGIN
 		    current_timestamp,
 		    null
 		);
-		
+
         INSERT INTO transacciones(monedaid, usuariomodificacion, tipoid, estadotransaccionid, ordenid, tipocambioid, tipocambio, monto, descripcion, fecha, checksum)
         VALUES (v_usd, v_admin, v_tipo_tx_importacion,
                 CASE WHEN i % 2 = 0 THEN v_estado_tx_aprobada ELSE v_estado_tx_pendiente END,
@@ -739,18 +735,18 @@ CREATE OR REPLACE PROCEDURE sp_orquestar_carga_etheria_global()
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    TRUNCATE TABLE 
-        acciones, balanceneto, caracteristicas, categorias, centroslogisticos, 
-        contactos, contactosproveedor, correoscontactos, direcciones, 
-        divisionesgeograficas, estadoscuenta, estadosordenes, estadotransacciones, 
-        historialcambiosmonedas, historialpreciosproducto, impuestospais, 
-        inventarios, logs, lotes, monedas, movimientosinventario, nivelesgeograficos, 
-        ordendetalledescuentos, ordendetalleimpuestos, ordendetallepermisos, 
-        ordendetalles, ordenes, paises, permisosimportacion, permisossistema, 
-        permisosxrole, productos, proveedores, roles, rolesxusuario, tablassistema, 
-        telefonoscontactos, tipomovimientosinventario, tiposcambio, 
-        tiposcentrologistico, tiposcontactos, tiposorden, tipospermisos, 
-        tipostelefonos, tipotransacciones, transacciones, trazabilidadorden, 
+    TRUNCATE TABLE
+        acciones, balanceneto, caracteristicas, categorias, centroslogisticos,
+        contactos, contactosproveedor, correoscontactos, direcciones,
+        divisionesgeograficas, estadoscuenta, estadosordenes, estadotransacciones,
+        historialcambiosmonedas, historialpreciosproducto, impuestospais,
+        inventarios, logs, lotes, monedas, movimientosinventario, nivelesgeograficos,
+        ordendetalledescuentos, ordendetalleimpuestos, ordendetallepermisos,
+        ordendetalles, ordenes, paises, permisosimportacion, permisossistema,
+        permisosxrole, productos, proveedores, roles, rolesxusuario, tablassistema,
+        telefonoscontactos, tipomovimientosinventario, tiposcambio,
+        tiposcentrologistico, tiposcontactos, tiposorden, tipospermisos,
+        tipostelefonos, tipotransacciones, transacciones, trazabilidadorden,
         usuarios, valorcaracteristicas
     RESTART IDENTITY CASCADE;
     CALL sp_cargar_support_base();
