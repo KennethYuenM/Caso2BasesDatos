@@ -1,0 +1,2 @@
+CREATE DATABASE "etheriaGlobal";
+CREATE DATABASE "etheriaDW";

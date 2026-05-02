@@ -1,5 +1,4 @@
-DROP DATABASE IF EXISTS etheriaDW;
-CREATE DATABASE etheriaDW;
+\connect etheriaDW
 
 CREATE TABLE centroAnalisis (
     registroID BIGSERIAL PRIMARY KEY,

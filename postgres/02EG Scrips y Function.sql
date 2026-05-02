@@ -1,3 +1,4 @@
+\connect etheriaGlobal
 CREATE OR REPLACE FUNCTION fn_generar_checksum(p_data jsonb)
 RETURNS text
 LANGUAGE plpgsql

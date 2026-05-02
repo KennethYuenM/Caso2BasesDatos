@@ -1,3 +1,4 @@
+\connect etheriaGlobal
 CALL sp_cargar_tablas();
 
 DO $$
@@ -764,3 +765,4 @@ EXCEPTION
         RAISE;
 END;
 $$;
+CALL sp_orquestar_carga_etheria_global();

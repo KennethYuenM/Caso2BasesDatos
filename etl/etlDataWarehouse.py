@@ -4,19 +4,19 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
-mysqlHost = "localhost"
+mysqlHost = "mysql"
 mysqlPort = 3306
 mysqlUser = "root"
 mysqlPassword = "root123"
 mysqlDatabase = "dynamicBrandsDB"
 
-etheriaPostgresHost = "localhost"
+etheriaPostgresHost = "postgres"
 etheriaPostgresPort = 5432
 etheriaPostgresUser = "postgres"
 etheriaPostgresPassword = "postgres"
 etheriaPostgresDatabase = "etheriaGlobal"
 
-dwPostgresHost = "localhost"
+dwPostgresHost = "postgres"
 dwPostgresPort = 5432
 dwPostgresUser = "postgres"
 dwPostgresPassword = "postgres"
