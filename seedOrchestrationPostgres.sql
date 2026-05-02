@@ -765,6 +765,6 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         CALL sp_log_proceso('sp_orquestar_carga_etheria_global', 'general', 'ERROR', sqlerrm, 0);
-        RAISE;UPD
+        RAISE;
 END;
 $$;
