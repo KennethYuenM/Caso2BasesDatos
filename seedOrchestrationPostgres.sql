@@ -739,6 +739,20 @@ CREATE OR REPLACE PROCEDURE sp_orquestar_carga_etheria_global()
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    TRUNCATE TABLE 
+        acciones, balanceneto, caracteristicas, categorias, centroslogisticos, 
+        contactos, contactosproveedor, correoscontactos, direcciones, 
+        divisionesgeograficas, estadoscuenta, estadosordenes, estadotransacciones, 
+        historialcambiosmonedas, historialpreciosproducto, impuestospais, 
+        inventarios, logs, lotes, monedas, movimientosinventario, nivelesgeograficos, 
+        ordendetalledescuentos, ordendetalleimpuestos, ordendetallepermisos, 
+        ordendetalles, ordenes, paises, permisosimportacion, permisossistema, 
+        permisosxrole, productos, proveedores, roles, rolesxusuario, tablassistema, 
+        telefonoscontactos, tipomovimientosinventario, tiposcambio, 
+        tiposcentrologistico, tiposcontactos, tiposorden, tipospermisos, 
+        tipostelefonos, tipotransacciones, transacciones, trazabilidadorden, 
+        usuarios, valorcaracteristicas
+    RESTART IDENTITY CASCADE;
     CALL sp_cargar_support_base();
     CALL sp_cargar_catalogos_etheria();
     CALL sp_cargar_geografia_etheria();

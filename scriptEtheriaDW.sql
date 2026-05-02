@@ -1,15 +1,20 @@
 DROP DATABASE IF EXISTS etheriaDW;
 CREATE DATABASE etheriaDW;
-\c etheriaDW;
+
+-- =========================================================
+-- TABLA CENTRALIZADA DESNORMALIZADA
+-- Una fila por cada linea de detalle de venta/orden
+-- con todo el contexto embebido para analisis directo
+-- =========================================================
 
 CREATE TABLE centroAnalisis (
     registroID BIGSERIAL PRIMARY KEY,
 
     -- ORIGEN DEL DATO
-    sistemaOrigen VARCHAR(30) NOT NULL,                   
-    idOrdenOrigen VARCHAR(50),                            
-    idProductoOrigen INT,                                 
-    idOrdenDetalleOrigen INT,                              
+    sistemaOrigen VARCHAR(30) NOT NULL,                    -- 'DYNAMIC_BRANDS' o 'ETHERIA'
+    idOrdenOrigen VARCHAR(50),                             -- codigo de orden en el sistema origen
+    idProductoOrigen INT,                                  -- ID del producto en el sistema origen
+    idOrdenDetalleOrigen INT,                              -- ID del detalle de orden en el sistema origen
 
     -- TIEMPO
     fechaOrden DATE NOT NULL,
@@ -104,6 +109,9 @@ CREATE TABLE centroAnalisis (
     fechaActualizacionDW TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =========================================================
+-- INDICES PARA CONSULTAS FRECUENTES EN METABASE
+-- =========================================================
 CREATE INDEX idx_centro_sistemaOrigen ON centroAnalisis (sistemaOrigen);
 CREATE INDEX idx_centro_fechaOrden ON centroAnalisis (fechaOrden);
 CREATE INDEX idx_centro_anioOrden ON centroAnalisis (anioOrden);
