@@ -381,6 +381,7 @@ Pueden abrir y cerrar "N" sitios en diferentes países de Latam con un solo clic
 - productID bigint
 - countryID bigint
 - permissionCost bigint
+- exportCost bigint
 - permissionCode varchar 50
 - permissionName varchar 100
 - permissionStatusCode varchar 30

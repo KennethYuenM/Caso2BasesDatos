@@ -99,7 +99,8 @@ SELECT
     inv.reservedQuantity AS cantidadReservada,
     inv.reorderLevel AS nivelReorden,
 
-    perm.permissionCost AS costoPermisoImportacion
+    perm.permissionCost AS costoPermisoImportacion,
+    perm.exportCost AS costoPermisoExportacion
 
 FROM customerOrderDetail cod
 JOIN customerOrder co
@@ -253,6 +254,7 @@ try:
         "costoEnvioLocal",
         "totalLineaLocal",
         "costoPermisoImportacion",
+        "costoPermisoExportacion",
         "costoProductoBase",
         "cantidadDisponible",
         "cantidadReservada",
@@ -279,6 +281,7 @@ try:
         "costoEnvioLocal",
         "totalLineaLocal",
         "costoPermisoImportacion",
+        "costoPermisoExportacion",
         "costoProductoBase",
         "precioBaseUSD"
     ]
@@ -293,12 +296,14 @@ try:
     mergedDataFrame["costoEnvioUSD"] = mergedDataFrame["costoEnvioLocal"] / mergedDataFrame["tipoCambioUSD"]
     mergedDataFrame["totalLineaUSD"] = mergedDataFrame["totalLineaLocal"] / mergedDataFrame["tipoCambioUSD"]
     mergedDataFrame["costoPermisoImportacionUSD"] = mergedDataFrame["costoPermisoImportacion"] / mergedDataFrame["tipoCambioUSD"]
+    mergedDataFrame["costoPermisoExportacionUSD"] = mergedDataFrame["costoPermisoExportacion"] / mergedDataFrame["tipoCambioUSD"]
 
     mergedDataFrame["costoProductoBaseTotal"] = mergedDataFrame["costoProductoBase"] * mergedDataFrame["cantidad"]
 
     mergedDataFrame["costoTotalOperativo"] = (
         mergedDataFrame["costoProductoBaseTotal"]
         + mergedDataFrame["costoPermisoImportacionUSD"]
+        + mergedDataFrame["costoPermisoExportacionUSD"]
         + mergedDataFrame["costoEnvioUSD"]
     )
 
@@ -404,7 +409,7 @@ try:
     resultadoFinal["totallineausd"] = mergedDataFrame["totalLineaUSD"]
 
     resultadoFinal["costopermisoimportacion"] = mergedDataFrame["costoPermisoImportacionUSD"]
-    resultadoFinal["costopermisoexportacion"] = 0.0
+    resultadoFinal["costopermisoexportacion"] = mergedDataFrame["costoPermisoExportacionUSD"]
     resultadoFinal["costologistico"] = mergedDataFrame["costoEnvioUSD"]
     resultadoFinal["costoproductobase"] = mergedDataFrame["costoProductoBaseTotal"]
     resultadoFinal["costototaloperativo"] = mergedDataFrame["costoTotalOperativo"]

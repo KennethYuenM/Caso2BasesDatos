@@ -789,6 +789,7 @@ CREATE PROCEDURE spInsertCountryProductPermission(
     IN productIDParam BIGINT,
     IN countryIDParam BIGINT,
     IN permissionCostParam BIGINT,
+    IN exportCostParam BIGINT,
     IN permissionCodeParam VARCHAR(50),
     IN permissionNameParam VARCHAR(100),
     IN permissionStatusCodeParam VARCHAR(30),
@@ -808,6 +809,9 @@ BEGIN
     IF permissionCostParam < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCostParam cannot be negative';
     END IF;
+    IF exportCostParam < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exportCostParam cannot be negative';
+    END IF;
     IF expiresAtParam IS NOT NULL AND issuedAtParam IS NOT NULL AND expiresAtParam < issuedAtParam THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAtParam cannot be earlier than issuedAtParam';
     END IF;
@@ -815,6 +819,7 @@ BEGIN
         productID,
         countryID,
         permissionCost,
+        exportCost,
         permissionCode,
         permissionName,
         permissionStatusCode,
@@ -828,6 +833,7 @@ BEGIN
         productIDParam,
         countryIDParam,
         permissionCostParam,
+        exportCostParam,
         permissionCodeParam,
         permissionNameParam,
         permissionStatusCodeParam,

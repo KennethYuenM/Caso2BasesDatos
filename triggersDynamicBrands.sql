@@ -293,6 +293,9 @@ BEGIN
     IF NEW.permissionCost < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'permissionCost cannot be negative';
     END IF;
+    IF NEW.exportCost < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'exportCost cannot be negative';
+    END IF;
     IF NEW.expiresAt IS NOT NULL AND NEW.issuedAt IS NOT NULL AND NEW.expiresAt < NEW.issuedAt THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'expiresAt cannot be earlier than issuedAt';
     END IF;

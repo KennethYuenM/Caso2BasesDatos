@@ -459,23 +459,23 @@ BEGIN
     CALL spUpdateCustomerOrderStatus(order5ID, 'PAID', adminPersonID, 'Pago aprobado');
     CALL spInsertShipment(order5ID, 'SHIP-005', 'PENDING', 'Ciudad de Guatemala, Guatemala', NULL, 'Cargo Expreso', 'CUSTOMER', NULL, NULL);
     CALL spInsertCountryProductPermission(
-        (SELECT productID FROM product WHERE productCode = 'PROD-001'), costaRicaCountryID, 50000,
+        (SELECT productID FROM product WHERE productCode = 'PROD-001'), costaRicaCountryID, 50000, 12000,
         'PERM-CR-001', 'Registro sanitario bebida organica', 'APPROVED', 'CERT-CR-001',
         'Ministerio de Salud CR', CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 YEAR), 'Permiso aprobado');
     CALL spInsertCountryProductPermission(
-        (SELECT productID FROM product WHERE productCode = 'PROD-035'), peruCountryID, 30000,
+        (SELECT productID FROM product WHERE productCode = 'PROD-035'), peruCountryID, 30000, 8500,
         'PERM-PE-001', 'Registro sanitario aceite esencial', 'APPROVED', 'CERT-PE-001',
         'DIGESA Peru', CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 YEAR), 'Producto aprobado');
     CALL spInsertCountryProductPermission(
-        (SELECT productID FROM product WHERE productCode = 'PROD-046'), guatemalaCountryID, 25000,
+        (SELECT productID FROM product WHERE productCode = 'PROD-046'), guatemalaCountryID, 25000, 7000,
         'PERM-GT-001', 'Licencia cosmetico capilar', 'APPROVED', 'CERT-GT-001',
         'MAGA Guatemala', CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 YEAR), 'Exportacion aprobada');
     CALL spInsertCountryProductPermission(
-        (SELECT productID FROM product WHERE productCode = 'PROD-068'), mexicoCountryID, 40000,
+        (SELECT productID FROM product WHERE productCode = 'PROD-068'), mexicoCountryID, 40000, 9000,
         'PERM-MX-001', 'Registro sanitario aromaterapia', 'PENDING', NULL,
         'COFEPRIS Mexico', CURRENT_TIMESTAMP, NULL, 'En proceso de aprobacion');
     CALL spInsertCountryProductPermission(
-        (SELECT productID FROM product WHERE productCode = 'PROD-079'), colombiaCountryID, 35000,
+        (SELECT productID FROM product WHERE productCode = 'PROD-079'), colombiaCountryID, 35000, 7800,
         'PERM-CO-001', 'Registro INVIMA alimento organico', 'APPROVED', 'CERT-CO-001',
         'INVIMA Colombia', CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 YEAR), 'Aprobado por INVIMA');
     CALL spInsertCountryProductRequirement(

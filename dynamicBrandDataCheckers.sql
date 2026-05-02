@@ -161,6 +161,9 @@ WHERE p.productID IS NULL;
 SELECT 'negativePermissionCost' AS checkerName, COUNT(*) AS issueCount
 FROM countryProductPermission
 WHERE permissionCost < 0;
+SELECT 'negativeExportCost' AS checkerName, COUNT(*) AS issueCount
+FROM countryProductPermission
+WHERE exportCost < 0;
 SELECT 'permissionsInvalidDates' AS checkerName, COUNT(*) AS issueCount
 FROM countryProductPermission
 WHERE expiresAt IS NOT NULL
