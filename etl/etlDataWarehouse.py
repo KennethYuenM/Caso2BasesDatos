@@ -353,6 +353,8 @@ try:
         "ingresosSitioCalculado"
     ]
 
+    mergedDataFrame = mergedDataFrame.reset_index(drop=True)
+
     fechaCargaActual = datetime.now(timezone.utc)
 
     resultadoFinal = pd.DataFrame(index=mergedDataFrame.index)
@@ -418,9 +420,9 @@ try:
     resultadoFinal["porcentajemargen"] = mergedDataFrame["porcentajeMargen"]
 
     resultadoFinal["estadoorden"] = mergedDataFrame["estadoOrden"]
-    resultadoFinal["estadopago"] = mergedDataFrame["estadoPago"]
+    resultadoFinal["estadopago"] = mergedDataFrame["estadoPago"].values
     resultadoFinal["estadoenvio"] = mergedDataFrame["estadoEnvio"]
-    resultadoFinal["metodopago"] = mergedDataFrame["metodoPago"]
+    resultadoFinal["metodopago"] = mergedDataFrame["metodoPago"].values
 
     resultadoFinal["transportista"] = mergedDataFrame["transportista"]
     resultadoFinal["direccionenvio"] = mergedDataFrame["direccionEnvio"]
@@ -473,6 +475,7 @@ try:
     for nombreColumna in columnasObligatoriasNumericas:
         resultadoFinal[nombreColumna] = resultadoFinal[nombreColumna].fillna(0.0)
 
+
     resultadoFinal = resultadoFinal.replace({np.nan: None})
 
     productosSinCruce = resultadoFinal[resultadoFinal["nombreproveedor"].isna()]
@@ -481,6 +484,8 @@ try:
     if cantidadProductosSinCruce > 0:
         print("ADVERTENCIA: hay productos sin cruce completo con Etheria:", cantidadProductosSinCruce)
         print(productosSinCruce[["idproductoorigen", "nombreproducto"]].drop_duplicates().to_string(index=False))
+
+
 
     with dwEngine.begin() as conexionDw:
         conexionDw.exec_driver_sql("DELETE FROM centroanalisis WHERE sistemaorigen = 'DYNAMIC_BRANDS'")
